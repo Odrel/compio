@@ -229,9 +229,16 @@ function buildSpecTable() {
       }
       specCell.appendChild(specCellInner);
 
-      const cooldownCell = document.createElement("td");
-      cooldownCell.textContent = entry.cooldownName || "—";
-      if (!entry.cooldownName) cooldownCell.classList.add("muted");
+      const damageProfileCell = document.createElement("td");
+      if (entry.damageProfile) {
+        const pill = document.createElement("span");
+        pill.className = `damage-profile-pill ${entry.damageProfile}`;
+        pill.textContent = entry.damageProfile;
+        damageProfileCell.appendChild(pill);
+      } else {
+        damageProfileCell.textContent = "—";
+        damageProfileCell.classList.add("muted");
+      }
 
       const durationCell = document.createElement("td");
       durationCell.textContent = entry.cooldownSeconds != null ? formatCooldown(entry.cooldownSeconds) : "—";
@@ -267,7 +274,7 @@ function buildSpecTable() {
 
       row.appendChild(classCell);
       row.appendChild(specCell);
-      row.appendChild(cooldownCell);
+      row.appendChild(damageProfileCell);
       row.appendChild(durationCell);
       row.appendChild(lustCell);
       row.appendChild(rezCell);

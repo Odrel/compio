@@ -9,6 +9,9 @@
   --tank: #4a90d9;
   --healer: #3fbf6f;
   --dps: #d9534f;
+  --profile-cleave: #3fbf6f;
+  --profile-funnel: #a370f0;
+  --profile-aoe: #d9534f;
 }
 
 * { box-sizing: border-box; }
@@ -442,6 +445,21 @@ body {
   padding: 1px 6px;
   border-radius: 10px;
 }
+
+.damage-profile-pill {
+  display: inline-block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #0d0f14;
+}
+
+.damage-profile-pill.Cleave { background: var(--profile-cleave); }
+.damage-profile-pill.Funnel { background: var(--profile-funnel); }
+.damage-profile-pill.AoE { background: var(--profile-aoe); }
 
 .spec-table tbody tr {
   cursor: pointer;
