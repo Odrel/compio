@@ -73,11 +73,6 @@ function buildAbilityCell(abilities) {
   return cell;
 }
 
-// "Blind (2 min), Sap (No CD)" — used for the Crowd Control panel chips.
-function formatAbilityList(abilities) {
-  return abilities.map((a) => `${a.name} (${formatAbilityCooldown(a.cooldownSeconds)})`).join(", ");
-}
-
 function specInitials(specName) {
   const words = specName.split(" ");
   if (words.length > 1) {
@@ -374,7 +369,7 @@ function dedupeEntries(entries) {
   });
 }
 
-function buildUtilityRow({ ok, label, providers, notCoveredText, labelSuffix }) {
+function buildUtilityRow({ ok, label, providers, notCoveredText }) {
   const li = document.createElement("li");
   li.className = `utility-row ${ok ? "ok" : "warn"}`;
 
@@ -396,8 +391,7 @@ function buildUtilityRow({ ok, label, providers, notCoveredText, labelSuffix }) 
       chip.className = "utility-provider-chip";
       chip.appendChild(createSpecIcon(entry, "spec-icon--utility"));
       const text = document.createElement("span");
-      const suffix = labelSuffix ? labelSuffix(entry) : null;
-      text.textContent = suffix ? `${entry.spec} ${entry.class} — ${suffix}` : `${entry.spec} ${entry.class}`;
+      text.textContent = `${entry.spec} ${entry.class}`;
       chip.appendChild(text);
       providersWrap.appendChild(chip);
     });
@@ -412,6 +406,97 @@ function buildUtilityRow({ ok, label, providers, notCoveredText, labelSuffix }) 
   return li;
 }
 
+// Flattens {entry, abilityMap} into one {entry, ability} pair per ability
+// instance, deduping identical spec+ability pairs (e.g. 2x Fire Mage both
+// having Polymorph only needs to show once).
+function collectAbilityInstances(entries, abilityMap) {
+  const seen = new Set();
+  const instances = [];
+  entries.forEach((entry) => {
+    const abilities = abilityMap[specKey(entry)];
+    if (!abilities) return;
+    abilities.forEach((ability) => {
+      const dedupeKey = `${specKey(entry)}:${ability.name}`;
+      if (seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      instances.push({ entry, ability });
+    });
+  });
+  return instances;
+}
+
+// Builds one Crowd Control section (Hard CC or AoE Disrupt): a status/label
+// header, then its abilities grouped by cooldown duration — duration is the
+// most prominent element of each group, with spec chips underneath it.
+function buildCrowdControlSection({ label, instances, notCoveredText }) {
+  const section = document.createElement("li");
+  section.className = `utility-row cc-section ${instances.length > 0 ? "ok" : "warn"}`;
+
+  const header = document.createElement("div");
+  header.className = "cc-section-header";
+  const status = document.createElement("span");
+  status.className = "status";
+  status.textContent = instances.length > 0 ? "OK" : "!";
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "utility-label";
+  labelSpan.textContent = label;
+  header.appendChild(status);
+  header.appendChild(labelSpan);
+  section.appendChild(header);
+
+  if (instances.length === 0) {
+    const detail = document.createElement("span");
+    detail.className = "detail";
+    detail.textContent = notCoveredText;
+    section.appendChild(detail);
+    return section;
+  }
+
+  const groups = new Map();
+  instances.forEach((instance) => {
+    const key = instance.ability.cooldownSeconds;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(instance);
+  });
+
+  // Numeric durations ascending, "no cooldown" abilities last.
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    if (a == null) return 1;
+    if (b == null) return -1;
+    return a - b;
+  });
+
+  const groupsWrap = document.createElement("div");
+  groupsWrap.className = "cc-groups";
+  sortedKeys.forEach((seconds) => {
+    const group = document.createElement("div");
+    group.className = "cc-duration-group";
+
+    const duration = document.createElement("div");
+    duration.className = "cc-duration";
+    duration.textContent = formatAbilityCooldown(seconds);
+    group.appendChild(duration);
+
+    const chips = document.createElement("div");
+    chips.className = "cc-chips";
+    groups.get(seconds).forEach(({ entry, ability }) => {
+      const chip = document.createElement("span");
+      chip.className = "timeline-chip";
+      chip.appendChild(createSpecIcon(entry, "spec-icon--timeline"));
+      const chipLabel = document.createElement("span");
+      chipLabel.textContent = `${entry.spec} ${entry.class} (${ability.name})`;
+      chip.appendChild(chipLabel);
+      chips.appendChild(chip);
+    });
+    group.appendChild(chips);
+
+    groupsWrap.appendChild(group);
+  });
+  section.appendChild(groupsWrap);
+
+  return section;
+}
+
 function renderCrowdControl() {
   const list = document.getElementById("crowd-control-check");
   list.innerHTML = "";
@@ -423,26 +508,19 @@ function renderCrowdControl() {
     return;
   }
 
-  const hardCcProviders = selected.filter((e) => HARD_CC_ABILITIES[specKey(e)]);
-  const aoeDisruptProviders = selected.filter((e) => AOE_DISRUPT_ABILITIES[specKey(e)]);
-
   list.appendChild(
-    buildUtilityRow({
-      ok: hardCcProviders.length > 0,
+    buildCrowdControlSection({
       label: "Hard CC",
-      providers: hardCcProviders,
+      instances: collectAbilityInstances(selected, HARD_CC_ABILITIES),
       notCoveredText: "Not covered — no strong single-target stun/incapacitate in the group.",
-      labelSuffix: (entry) => formatAbilityList(HARD_CC_ABILITIES[specKey(entry)]),
     })
   );
 
   list.appendChild(
-    buildUtilityRow({
-      ok: aoeDisruptProviders.length > 0,
+    buildCrowdControlSection({
       label: "AoE Disrupt",
-      providers: aoeDisruptProviders,
+      instances: collectAbilityInstances(selected, AOE_DISRUPT_ABILITIES),
       notCoveredText: "Not covered — no group-wide stun/fear/knockback for trash pulls.",
-      labelSuffix: (entry) => formatAbilityList(AOE_DISRUPT_ABILITIES[specKey(entry)]),
     })
   );
 }
