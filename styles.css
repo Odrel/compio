@@ -239,8 +239,11 @@ body {
 }
 
 .timeline-group .timeline-timer {
+  display: inline-block;
   color: var(--gold);
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 0.3px;
 }
 
 .timeline-chips {
