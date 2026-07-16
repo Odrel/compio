@@ -696,6 +696,16 @@ body {
   text-decoration: underline;
 }
 
+.raiderio-player-name {
+  color: var(--gold);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.raiderio-player-name:hover {
+  text-decoration: underline;
+}
+
 .raiderio-freshness {
   margin: 10px 0 0;
   text-align: center;

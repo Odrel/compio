@@ -109,6 +109,10 @@ function buildQueryUrl(dungeonSlug, page, apiKey) {
 // redundant per-run since the frontend already has a slug->name/icon_url
 // lookup (RAIDER_IO_DUNGEONS in data.js) and a single dataset-level season
 // covers every run in the file. Dropping them saves ~18% of bytes/run.
+// `character.name`/`path` are kept so the frontend can show/link the actual
+// player instead of just their spec — `path` is raider.io's own ready-made
+// relative profile URL (e.g. "/characters/us/frostmourne/Bearbee"), so it
+// doesn't need to be reconstructed from region/realm/name separately.
 function trimRanking(ranking) {
   return {
     rank: ranking.rank,
@@ -123,6 +127,8 @@ function trimRanking(ranking) {
       roster: ranking.run.roster.map((m) => ({
         role: m.role,
         character: {
+          name: m.character.name,
+          path: m.character.path,
           class: { name: m.character.class.name },
           spec: { name: m.character.spec.name },
         },

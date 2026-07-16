@@ -715,12 +715,30 @@ function buildRaiderIoResultRow(ranking) {
     )
     .forEach((member) => {
       const entry = raiderIoEntryForRosterMember(member);
+      const specLabel = `${entry.spec} ${entry.class}`;
       const chip = document.createElement("span");
       chip.className = "utility-provider-chip";
-      chip.appendChild(createSpecIcon(entry, "spec-icon--utility"));
-      const text = document.createElement("span");
-      text.textContent = `${entry.spec} ${entry.class}`;
-      chip.appendChild(text);
+      const icon = createSpecIcon(entry, "spec-icon--utility");
+      icon.title = specLabel; // spec/class now only surfaces as a tooltip — see the name/link below
+      chip.appendChild(icon);
+
+      const { name, path } = member.character;
+      if (name && path) {
+        const nameLink = document.createElement("a");
+        nameLink.className = "raiderio-player-name";
+        nameLink.href = `https://raider.io${path}`;
+        nameLink.target = "_blank";
+        nameLink.rel = "noopener noreferrer";
+        nameLink.textContent = name;
+        chip.appendChild(nameLink);
+      } else {
+        // Falls back to the old spec/class text for roster entries from a
+        // cache generated before name/path were added — see trimRanking()
+        // in scripts/fetch-raiderio-cache.js.
+        const text = document.createElement("span");
+        text.textContent = specLabel;
+        chip.appendChild(text);
+      }
       roster.appendChild(chip);
     });
   li.appendChild(roster);
