@@ -435,13 +435,15 @@ function buildCrowdControlSection({ label, instances, notCoveredText }) {
 
   const header = document.createElement("div");
   header.className = "cc-section-header";
-  const status = document.createElement("span");
-  status.className = "status";
-  status.textContent = instances.length > 0 ? "OK" : "!";
+  if (instances.length === 0) {
+    const status = document.createElement("span");
+    status.className = "status";
+    status.textContent = "!";
+    header.appendChild(status);
+  }
   const labelSpan = document.createElement("span");
   labelSpan.className = "utility-label";
   labelSpan.textContent = label;
-  header.appendChild(status);
   header.appendChild(labelSpan);
   section.appendChild(header);
 
