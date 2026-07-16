@@ -58,10 +58,19 @@ const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
 
+// If a dungeon fails entirely (its per-page retries exhausted — see
+// MAX_RETRIES above, ~12s total), wait this long and retry the whole
+// dungeon once more. Real-world case: raider.io returned HTTP 502 for
+// about a minute across every in-flight request (not one specific
+// dungeon/page), long enough to exhaust the ~12s page-level retry budget
+// but short enough that a longer cooldown rides it out.
+const DUNGEON_RETRY_COOLDOWN_MS = 60000;
+
 // Sanity floor — if a full run collects fewer than this many total runs
-// across all 8 dungeons, something is badly wrong (raider.io outage, API
-// change, etc.). Refuse to write the file so a broken/near-empty dataset
-// can never overwrite the last-known-good committed cache.
+// across all 8 dungeons (after the fallback-to-previous-data below), the
+// entire run — not just one dungeon — is badly wrong (raider.io outage,
+// API change, etc.). Refuse to write the file so a broken/near-empty
+// dataset can never overwrite the last-known-good committed cache.
 const MIN_SANE_TOTAL_RUNS = 500;
 
 // GitHub hard-blocks pushing any single file over 100MB. The committed file
@@ -188,8 +197,49 @@ async function fetchDungeon(dungeonSlug, apiKey, batchSize, batchDelayMs) {
   return allRankings;
 }
 
+// Retries an entire dungeon fetch once more, after a long cooldown, if the
+// first attempt fails outright — rides out a transient raider.io-side blip
+// (e.g. HTTP 502s) that outlasts fetchPageWithRetry's shorter per-page
+// retry budget. If this second attempt also fails, the error propagates to
+// the caller, which falls back to that dungeon's previously cached runs.
+async function fetchDungeonResilient(dungeonSlug, apiKey, batchSize, batchDelayMs) {
+  try {
+    return await fetchDungeon(dungeonSlug, apiKey, batchSize, batchDelayMs);
+  } catch (err) {
+    console.warn(
+      `${dungeonSlug}: first attempt failed (${err.message}) — retrying the whole dungeon after a ${DUNGEON_RETRY_COOLDOWN_MS / 1000}s cooldown.`
+    );
+    await sleep(DUNGEON_RETRY_COOLDOWN_MS);
+    return fetchDungeon(dungeonSlug, apiKey, batchSize, batchDelayMs);
+  }
+}
+
 function gzipPayload(generatedAt, season, runs) {
   return zlib.gzipSync(JSON.stringify({ generatedAt, season, runs }));
+}
+
+// Reads the previously committed cache (already on disk from actions/checkout
+// before this script runs) and groups its runs by dungeon slug, so a dungeon
+// that fails entirely this run (even after fetchDungeonResilient's retry) can
+// fall back to its last-known-good data instead of contributing zero runs —
+// a transient raider.io outage should never erase a dungeon's coverage from
+// the live site. Returns an empty map if there's no previous file yet (first
+// run ever) or it can't be read.
+function loadPreviousDungeonRuns() {
+  const bySlug = new Map();
+  if (!fs.existsSync(OUTPUT_PATH)) return bySlug;
+  try {
+    const previous = JSON.parse(zlib.gunzipSync(fs.readFileSync(OUTPUT_PATH)));
+    for (const ranking of previous.runs || []) {
+      const slug = ranking?.run?.dungeon;
+      if (!slug) continue;
+      if (!bySlug.has(slug)) bySlug.set(slug, []);
+      bySlug.get(slug).push(ranking);
+    }
+  } catch (err) {
+    console.warn(`Could not read previous cache for fallback data: ${err.message}`);
+  }
+  return bySlug;
 }
 
 // Binary-searches the largest score-sorted prefix of `runs` whose gzip-
@@ -215,16 +265,23 @@ async function main() {
   const apiKey = process.env.RAIDERIO_API_KEY || null;
   const batchSize = apiKey ? AUTH_BATCH_SIZE : UNAUTH_BATCH_SIZE;
   const batchDelayMs = apiKey ? AUTH_BATCH_DELAY_MS : UNAUTH_BATCH_DELAY_MS;
+  const previousRunsBySlug = loadPreviousDungeonRuns();
   const results = [];
 
   for (const slug of DUNGEON_SLUGS) {
     try {
-      const rankings = await fetchDungeon(slug, apiKey, batchSize, batchDelayMs);
+      const rankings = await fetchDungeonResilient(slug, apiKey, batchSize, batchDelayMs);
       console.log(`${slug}: collected ${rankings.length} runs`);
       results.push(...rankings);
     } catch (err) {
-      // One dungeon failing entirely must not abort the other 7.
-      console.error(`${slug}: failed entirely — ${err.message}`);
+      // One dungeon failing entirely (even after fetchDungeonResilient's
+      // retry) must not abort the other 7, and must not erase this
+      // dungeon's coverage — fall back to its last committed runs.
+      const fallback = previousRunsBySlug.get(slug) || [];
+      console.error(
+        `${slug}: failed entirely even after retry — ${err.message}. Falling back to ${fallback.length} runs from the last committed cache.`
+      );
+      results.push(...fallback);
     }
   }
 
