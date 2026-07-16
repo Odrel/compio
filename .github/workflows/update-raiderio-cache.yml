@@ -37,10 +37,14 @@ jobs:
         run: |
           git config user.name "raiderio-cache-bot"
           git config user.email "actions@users.noreply.github.com"
-          if git status --porcelain | grep -q raiderio-cache.json; then
-            git add raiderio-cache.json
+          # Drop the old uncompressed file (superseded by the gzipped one
+          # below) — a no-op once it's already gone from a prior run.
+          git rm --cached --ignore-unmatch raiderio-cache.json > /dev/null
+          rm -f raiderio-cache.json
+          git add raiderio-cache.json.gz
+          if git diff --cached --quiet; then
+            echo "No changes to raiderio-cache.json.gz — skipping commit."
+          else
             git commit -m "Update Raider.IO cache ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
             git push
-          else
-            echo "No changes to raiderio-cache.json — skipping commit."
           fi

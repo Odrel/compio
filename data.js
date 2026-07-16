@@ -420,24 +420,30 @@ function specKey(entry) {
 // actual fetching/pagination/rate-limit logic). This keeps the whole
 // dataset build off the critical path of every lookup click.
 //
+// `datasetUrl` points at a gzip-compressed file (the JSON compresses ~28x
+// since it's highly repetitive) — loadRaiderIoDataset() in app.js
+// decompresses it client-side via DecompressionStream before parsing.
+// Each run's `dungeon` field in the dataset is just a slug string (not a
+// {name,icon_url} object) — look those up from RAIDER_IO_DUNGEONS below.
+//
 // `season` is raider.io's slug for the CURRENT season and WILL GO STALE —
 // raider.io does not auto-roll this. Next expected rollover: season-mn-2
 // around 2026-12-16. When that happens, update this value AND the season
 // slug hardcoded in scripts/fetch-raiderio-cache.js.
 //
-// `iconCdnBase` is needed because `dungeon.icon_url` values in the dataset
-// are relative paths (e.g. "/images/wow/icons/large/xyz.jpg") that must be
+// `iconCdnBase` is needed because RAIDER_IO_DUNGEONS' `icon_url` values are
+// relative paths (e.g. "/images/wow/icons/large/xyz.jpg") that must be
 // prefixed with this host (verified: raider.io's own host 404s on that
 // path, cdn.raiderio.net serves it).
 //
 // `runUrlBase` builds an unofficial, undocumented run-page URL pattern
-// (`{runUrlBase}/{season}/{keystone_run_id}-{dungeon.slug}`) — raider.io's
+// (`{runUrlBase}/{season}/{keystone_run_id}-{dungeon slug}`) — raider.io's
 // API doesn't return a run URL directly. Verified working against a real
 // run, but could break if raider.io changes their routing.
 const RAIDER_IO = {
   iconCdnBase: "https://cdn.raiderio.net",
   runUrlBase: "https://raider.io/mythic-plus-runs",
-  datasetUrl: "raiderio-cache.json",
+  datasetUrl: "raiderio-cache.json.gz",
   season: "season-mn-1",
   resultsWanted: 5,
 };

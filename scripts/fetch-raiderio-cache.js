@@ -1,7 +1,8 @@
 // Fetches a large snapshot of Raider.IO Mythic+ runs across every current-
-// season dungeon and writes it to raiderio-cache.json at the repo root,
-// where GitHub Pages serves it as a static asset for the Raider.IO Lookup
-// panel (see loadRaiderIoDataset() in app.js).
+// season dungeon and writes it, gzip-compressed, to raiderio-cache.json.gz
+// at the repo root, where GitHub Pages serves it as a static asset for the
+// Raider.IO Lookup panel (see loadRaiderIoDataset() in app.js, which
+// decompresses it client-side via DecompressionStream).
 //
 // Run by .github/workflows/update-raiderio-cache.yml on a schedule. Plain
 // Node 20 script, no npm dependencies (uses Node's built-in fetch) — no
@@ -16,12 +17,13 @@
 
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 
 const SEASON = "season-mn-1";
 const REGION = "world";
 const AFFIXES = "all";
 const API_BASE = "https://raider.io/api/v1/mythic-plus/runs";
-const OUTPUT_PATH = path.join(__dirname, "..", "raiderio-cache.json");
+const OUTPUT_PATH = path.join(__dirname, "..", "raiderio-cache.json.gz");
 
 const DUNGEON_SLUGS = [
   "algethar-academy",
@@ -35,13 +37,14 @@ const DUNGEON_SLUGS = [
 ];
 
 // raider.io caps pagination at 100 pages/dungeon unauthenticated, 1000 with
-// an API key. We ask for up to 750/dungeon — early-stop-on-empty-page below
+// an API key — we ask for the full 1000. Early-stop-on-empty-page below
 // means an unauthenticated run (or a dungeon with fewer real completions)
-// simply stops short of this, so raising the ceiling is safe either way.
-// 750 x 8 dungeons is a worst-case ~120k runs, chosen to sit close to but
-// under GitHub's 100MB hard per-file limit (see MAX_OUTPUT_BYTES below,
-// which trims to the highest-scoring runs if a run ever gets close).
-const PAGES_PER_DUNGEON = 750;
+// simply stops short of this, so asking for the max is safe either way.
+// Worst case (~160k runs across 8 dungeons) compresses to only a few MB
+// (see gzip step + MAX_OUTPUT_BYTES below), so GitHub's 100MB per-file
+// push limit is no longer the constraint — this is simply "get everything
+// raider.io will give us."
+const PAGES_PER_DUNGEON = 1000;
 
 // Unauthenticated: raider.io allows 200 req/min. Authenticated (RAIDERIO_API_KEY
 // set): 1000 req/min. Both batch settings stay well under their respective
@@ -61,12 +64,16 @@ const RETRY_BASE_DELAY_MS = 2000;
 // can never overwrite the last-known-good committed cache.
 const MIN_SANE_TOTAL_RUNS = 500;
 
-// GitHub hard-blocks pushing any single file over 100MB. Stay comfortably
-// under that; if a run's raw collection would exceed this, trim down to the
-// highest-scoring runs rather than let the whole workflow fail on push —
-// dropping low-score runs is also exactly right for this feature, since it
-// only ever surfaces the *highest* keys for a given comp.
-const MAX_OUTPUT_BYTES = 90 * 1024 * 1024;
+// GitHub hard-blocks pushing any single file over 100MB. The committed file
+// is gzip-compressed (see gzipPayload below), and this repetitive JSON
+// compresses ~28x in practice, so even raider.io's absolute max output
+// (~160k runs) lands around ~5MB compressed — this budget is a generous
+// safety net that should never actually trigger, not a real constraint.
+// If it ever does, trim down to the highest-scoring runs rather than let
+// the whole workflow fail on push — dropping low-score runs is also
+// exactly right for this feature, since it only ever surfaces the
+// *highest* keys for a given comp.
+const MAX_OUTPUT_BYTES = 50 * 1024 * 1024;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,23 +95,22 @@ function buildQueryUrl(dungeonSlug, page, apiKey) {
 
 // Same trimmed shape the frontend's rosterMatchesComp/buildRaiderIoResultRow
 // expect (see app.js) — this script's output is consumed directly, with no
-// further client-side trimming.
+// further client-side trimming. `dungeon` is just the slug (not the full
+// {name,slug,icon_url} object) and `season` is omitted entirely — both are
+// redundant per-run since the frontend already has a slug->name/icon_url
+// lookup (RAIDER_IO_DUNGEONS in data.js) and a single dataset-level season
+// covers every run in the file. Dropping them saves ~18% of bytes/run.
 function trimRanking(ranking) {
   return {
     rank: ranking.rank,
     score: ranking.score,
     run: {
       keystone_run_id: ranking.run.keystone_run_id,
-      season: ranking.run.season,
       mythic_level: ranking.run.mythic_level,
       clear_time_ms: ranking.run.clear_time_ms,
       num_chests: ranking.run.num_chests,
       completed_at: ranking.run.completed_at,
-      dungeon: {
-        name: ranking.run.dungeon.name,
-        slug: ranking.run.dungeon.slug,
-        icon_url: ranking.run.dungeon.icon_url,
-      },
+      dungeon: ranking.run.dungeon.slug,
       roster: ranking.run.roster.map((m) => ({
         role: m.role,
         character: {
@@ -182,12 +188,18 @@ async function fetchDungeon(dungeonSlug, apiKey, batchSize, batchDelayMs) {
   return allRankings;
 }
 
-// Binary-searches the largest score-sorted prefix of `runs` whose serialized
-// JSON fits within maxBytes, so a too-large payload keeps its highest-value
-// (highest-scoring) runs rather than being truncated arbitrarily.
+function gzipPayload(generatedAt, season, runs) {
+  return zlib.gzipSync(JSON.stringify({ generatedAt, season, runs }));
+}
+
+// Binary-searches the largest score-sorted prefix of `runs` whose gzip-
+// compressed JSON fits within maxBytes (the actual committed size), so a
+// too-large payload keeps its highest-value (highest-scoring) runs rather
+// than being truncated arbitrarily. Only invoked in the rare case the
+// compressed payload exceeds the safety budget (see MAX_OUTPUT_BYTES).
 function trimToByteBudget(runs, generatedAt, season, maxBytes) {
   const sorted = [...runs].sort((a, b) => b.score - a.score);
-  const sizeOf = (count) => Buffer.byteLength(JSON.stringify({ generatedAt, season, runs: sorted.slice(0, count) }));
+  const sizeOf = (count) => gzipPayload(generatedAt, season, sorted.slice(0, count)).length;
 
   let lo = 0;
   let hi = sorted.length;
@@ -225,19 +237,19 @@ async function main() {
 
   const generatedAt = new Date().toISOString();
   let finalResults = results;
-  const rawSize = Buffer.byteLength(JSON.stringify({ generatedAt, season: SEASON, runs: results }));
+  let compressed = gzipPayload(generatedAt, SEASON, results);
 
-  if (rawSize > MAX_OUTPUT_BYTES) {
+  if (compressed.length > MAX_OUTPUT_BYTES) {
     console.warn(
-      `Collected payload is ${(rawSize / 1e6).toFixed(1)}MB, over the ${(MAX_OUTPUT_BYTES / 1e6).toFixed(0)}MB safety budget — trimming to the highest-scoring runs.`
+      `Compressed payload is ${(compressed.length / 1e6).toFixed(1)}MB, over the ${(MAX_OUTPUT_BYTES / 1e6).toFixed(0)}MB safety budget — trimming to the highest-scoring runs.`
     );
     finalResults = trimToByteBudget(results, generatedAt, SEASON, MAX_OUTPUT_BYTES);
-    console.log(`Trimmed ${results.length} -> ${finalResults.length} runs to fit the size budget.`);
+    compressed = gzipPayload(generatedAt, SEASON, finalResults);
+    console.log(`Trimmed ${results.length} -> ${finalResults.length} runs to fit the compressed size budget.`);
   }
 
-  const payload = { generatedAt, season: SEASON, runs: finalResults };
-  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(payload));
-  console.log(`Wrote ${finalResults.length} runs to ${OUTPUT_PATH}`);
+  fs.writeFileSync(OUTPUT_PATH, compressed);
+  console.log(`Wrote ${finalResults.length} runs (${(compressed.length / 1e6).toFixed(1)}MB compressed) to ${OUTPUT_PATH}`);
 }
 
 main().catch((err) => {

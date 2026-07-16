@@ -421,8 +421,8 @@ function raiderIoScopeKey(targetEntries) {
   return `${compFingerprint(targetEntries)}::${getSelectedDungeonSlug()}`;
 }
 
-// The pre-fetched dataset (see RAIDER_IO.datasetUrl in data.js) — a large
-// snapshot of Raider.IO runs refreshed on a schedule by
+// The pre-fetched dataset (see RAIDER_IO.datasetUrl in data.js) — a large,
+// gzip-compressed snapshot of Raider.IO runs refreshed on a schedule by
 // scripts/fetch-raiderio-cache.js / .github/workflows/update-raiderio-cache.yml,
 // committed to the repo and served as a static file by GitHub Pages. Loaded
 // once per session (lazily, on first lookup) and kept in memory — there are
@@ -447,7 +447,18 @@ async function loadRaiderIoDataset() {
     if (!response.ok) {
       throw new Error(`Raider.IO cache returned an error (HTTP ${response.status}).`);
     }
-    const dataset = await response.json();
+    if (typeof DecompressionStream !== "function") {
+      throw new Error(
+        "Your browser doesn't support decompressing the Raider.IO dataset — try a recent version of Chrome, Firefox, Safari, or Edge."
+      );
+    }
+    let dataset;
+    try {
+      const decompressed = response.body.pipeThrough(new DecompressionStream("gzip"));
+      dataset = JSON.parse(await new Response(decompressed).text());
+    } catch {
+      throw new Error("Could not read the Raider.IO dataset — check back after the next scheduled update.");
+    }
     raiderIoDataset = dataset;
     return dataset;
   })();
@@ -591,7 +602,7 @@ async function runRaiderIoLookup() {
   const matches = dataset.runs
     .filter(
       (r) =>
-        (selectedDungeon === "all" || r.run.dungeon.slug === selectedDungeon) &&
+        (selectedDungeon === "all" || r.run.dungeon === selectedDungeon) &&
         rosterMatchesComp(r.run.roster, targetEntries)
     )
     .sort((a, b) => b.score - a.score)
@@ -626,9 +637,13 @@ function raiderIoEntryForRosterMember(member) {
 }
 
 // Unofficial URL pattern — raider.io's API doesn't return a run URL. See the
-// comment on RAIDER_IO.runUrlBase in data.js.
+// comment on RAIDER_IO.runUrlBase in data.js. `season` comes off the loaded
+// dataset (not the run itself — every run in a given dataset shares one
+// season, so it isn't duplicated per-run); buildRunUrl is only ever called
+// while rendering results after a successful load, so raiderIoDataset is
+// guaranteed to be populated here.
 function buildRunUrl(run) {
-  return `${RAIDER_IO.runUrlBase}/${run.season}/${run.keystone_run_id}-${run.dungeon.slug}`;
+  return `${RAIDER_IO.runUrlBase}/${raiderIoDataset.season}/${run.keystone_run_id}-${run.dungeon}`;
 }
 
 function formatClearTime(ms) {
@@ -645,20 +660,25 @@ function buildRaiderIoResultRow(ranking) {
   const li = document.createElement("li");
   li.className = "utility-row raiderio-result-row";
 
+  // `run.dungeon` is just a slug (see trimRanking() in
+  // scripts/fetch-raiderio-cache.js) — look up its display name/icon from
+  // the same table the dungeon picker uses.
+  const dungeonInfo = RAIDER_IO_DUNGEONS.find((d) => d.slug === run.dungeon);
+
   const header = document.createElement("div");
   header.className = "raiderio-result-header";
 
   const dungeonIcon = document.createElement("img");
   dungeonIcon.className = "raiderio-dungeon-icon";
-  dungeonIcon.src = `${RAIDER_IO.iconCdnBase}${run.dungeon.icon_url}`;
-  dungeonIcon.alt = run.dungeon.name;
+  dungeonIcon.src = `${RAIDER_IO.iconCdnBase}${dungeonInfo?.icon_url || ""}`;
+  dungeonIcon.alt = dungeonInfo?.name || run.dungeon;
   dungeonIcon.loading = "lazy";
   dungeonIcon.addEventListener("error", () => dungeonIcon.remove());
   header.appendChild(dungeonIcon);
 
   const dungeonName = document.createElement("span");
   dungeonName.className = "raiderio-dungeon-name";
-  dungeonName.textContent = run.dungeon.name;
+  dungeonName.textContent = dungeonInfo?.name || run.dungeon;
   header.appendChild(dungeonName);
 
   const level = document.createElement("span");
