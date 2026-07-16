@@ -155,6 +155,14 @@ function buildSlots() {
     slotEl.appendChild(label);
     slotEl.appendChild(icon);
     slotEl.appendChild(caption);
+
+    if (entry && entry.damageProfile) {
+      const pill = document.createElement("span");
+      pill.className = `damage-profile-pill ${entry.damageProfile}`;
+      pill.textContent = entry.damageProfile;
+      slotEl.appendChild(pill);
+    }
+
     container.appendChild(slotEl);
   });
 }
