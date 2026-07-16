@@ -223,35 +223,6 @@ body {
   font-style: italic;
 }
 
-.cooldown-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.timeline-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: var(--bg-panel-alt);
-  border-radius: 6px;
-}
-
-.timeline-group .timeline-timer {
-  display: inline-block;
-  color: var(--gold);
-  font-weight: 800;
-  font-size: 1.4rem;
-  letter-spacing: 0.3px;
-}
-
-.timeline-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
 .timeline-chip {
   display: flex;
   align-items: center;
@@ -272,10 +243,11 @@ body {
   font-size: 0.4rem;
 }
 
-.timeline-note {
+.timeline-note-item {
   color: var(--text-dim);
   font-size: 0.8rem;
   font-style: italic;
+  padding: 0 10px;
 }
 
 .utility-check {

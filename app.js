@@ -320,7 +320,7 @@ function renderCooldownTimeline() {
     .filter((e) => e.role === ROLES.DPS && e.cooldownSeconds != null);
 
   if (dpsWithCooldowns.length === 0) {
-    container.innerHTML = '<p class="empty">Select DPS specs to see their cooldown cadence.</p>';
+    container.innerHTML = '<li class="empty">Select DPS specs to see their cooldown cadence.</li>';
     return;
   }
 
@@ -334,16 +334,17 @@ function renderCooldownTimeline() {
   const sortedKeys = [...groups.keys()].sort((a, b) => a - b);
   sortedKeys.forEach((seconds) => {
     const entries = groups.get(seconds);
-    const row = document.createElement("div");
-    row.className = "timeline-group";
 
-    const timer = document.createElement("span");
-    timer.className = "timeline-timer";
-    timer.textContent = formatCooldown(seconds);
-    row.appendChild(timer);
+    const group = document.createElement("li");
+    group.className = "cc-duration-group";
+
+    const duration = document.createElement("div");
+    duration.className = "cc-duration";
+    duration.textContent = formatCooldown(seconds);
+    group.appendChild(duration);
 
     const chips = document.createElement("div");
-    chips.className = "timeline-chips";
+    chips.className = "cc-chips";
     entries.forEach((entry) => {
       const chip = document.createElement("span");
       chip.className = "timeline-chip";
@@ -353,15 +354,15 @@ function renderCooldownTimeline() {
       chip.appendChild(label);
       chips.appendChild(chip);
     });
-    row.appendChild(chips);
+    group.appendChild(chips);
 
-    container.appendChild(row);
+    container.appendChild(group);
 
     if (entries.length > 1) {
-      const note = document.createElement("div");
-      note.className = "timeline-note";
+      const note = document.createElement("li");
+      note.className = "timeline-note-item";
       note.textContent = "Same cadence — these can be popped together every pull for stacked burst windows.";
-      row.appendChild(note);
+      container.appendChild(note);
     }
   });
 }
@@ -564,19 +565,6 @@ function renderUtilityCheck() {
     })
   );
 
-  const rosterLi = document.createElement("li");
-  rosterLi.className = `utility-row ${selected.length === 5 ? "ok" : "warn"}`;
-  rosterLi.innerHTML = `<span class="status">${selected.length === 5 ? "OK" : "!"}</span> <span class="utility-label">Full 5-player roster</span> <span class="detail">${
-    selected.length === 5
-      ? "All 5 roles filled."
-      : `${selected.length}/5 slots filled — click specs in the table below to fill the rest.`
-  }</span>`;
-  list.appendChild(rosterLi);
-
-  const reminder = document.createElement("li");
-  reminder.className = "utility-row";
-  reminder.innerHTML = `<span class="detail">Reminder: aim for at least 2 dedicated interrupters in the group, and check for slow/CC coverage on affix weeks that need it.</span>`;
-  list.appendChild(reminder);
 }
 
 function render() {
