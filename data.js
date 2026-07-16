@@ -411,3 +411,37 @@ const ABILITY_ICONS = {
 function specKey(entry) {
   return `${entry.class}:${entry.spec}`;
 }
+
+// Config for the Raider.IO Lookup panel (see runRaiderIoLookup() etc. in
+// app.js). Calls raider.io's public Mythic+ Runs API directly from the
+// browser — confirmed CORS is open and no API key is needed at this volume.
+//
+// `season` is raider.io's slug for the CURRENT season and WILL GO STALE —
+// raider.io does not auto-roll this. Next expected rollover: season-mn-2
+// around 2026-12-16. If lookups start returning 0 results across many
+// different comps, check this value first.
+//
+// `dungeon.icon_url` values returned by the API are relative paths (e.g.
+// "/images/wow/icons/large/xyz.jpg") — they must be prefixed with
+// `iconCdnBase`, not `apiBase`'s host (verified: raider.io's own host 404s
+// on that path, cdn.raiderio.net serves it).
+//
+// `runUrlBase` builds an unofficial, undocumented run-page URL pattern
+// (`{runUrlBase}/{season}/{keystone_run_id}-{dungeon.slug}`) — raider.io's
+// API doesn't return a run URL directly. Verified working against a real
+// run, but could break if raider.io changes their routing.
+const RAIDER_IO = {
+  apiBase: "https://raider.io/api/v1/mythic-plus/runs",
+  iconCdnBase: "https://cdn.raiderio.net",
+  runUrlBase: "https://raider.io/mythic-plus-runs",
+  season: "season-mn-1",
+  region: "world", // combines all regions, maximizes match chances
+  affixes: "all", // whole season, not just the current week
+  resultsWanted: 5,
+  // 40 pages x 20 runs/page = 800 runs scanned max. Raider.io itself caps
+  // unauthenticated pagination at 100 pages — never raise this above that.
+  maxPagesToScan: 40,
+  requestDelayMs: 150, // spacing between sequential page requests, stays well under 200 req/min
+  maxRetries: 2,
+  retryBaseDelayMs: 1000,
+};

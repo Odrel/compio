@@ -545,6 +545,103 @@ body {
   font-size: 0.75rem;
 }
 
+.raiderio-lookup-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--gold);
+  color: #0d0f14;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.raiderio-lookup-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.raiderio-lookup-btn:disabled {
+  background: var(--bg-panel-alt);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.raiderio-status {
+  min-height: 1.2rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 8px 0;
+}
+
+.raiderio-status--error {
+  color: var(--dps);
+}
+
+.raiderio-results {
+  margin-top: 4px;
+}
+
+.raiderio-result-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.raiderio-result-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.raiderio-dungeon-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.raiderio-dungeon-name {
+  font-weight: 600;
+}
+
+.raiderio-key-level {
+  color: var(--gold);
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+
+.raiderio-run-status,
+.raiderio-score,
+.raiderio-date {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.raiderio-result-link {
+  align-self: flex-start;
+  color: var(--gold);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.raiderio-result-link:hover {
+  text-decoration: underline;
+}
+
+.raiderio-attribution {
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.raiderio-attribution a {
+  color: var(--gold);
+}
+
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 1fr; }
   .col-right { position: static; }

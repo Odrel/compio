@@ -359,6 +359,315 @@ function getSelectedEntries() {
   );
 }
 
+// A fingerprint of the current 5-slot comp, order-independent within role.
+// Used to detect "the comp changed" so stale Raider.IO results get cleared.
+function compFingerprint(targetEntries) {
+  return targetEntries
+    .map((x) => specKey(x.entry))
+    .sort()
+    .join("|");
+}
+
+function rosterMemberKey(member) {
+  return `${member.character.class.name}:${member.character.spec.name}`;
+}
+
+// Whether a raider.io run's roster is exactly this 5-slot comp. Tank and
+// healer are single direct matches; the 3 DPS are compared as a sorted
+// multiset so duplicate specs (e.g. 2x Fire Mage) are handled correctly.
+function rosterMatchesComp(roster, targetEntries) {
+  const targetTank = targetEntries.find((x) => x.slot.role === ROLES.TANK)?.entry;
+  const targetHealer = targetEntries.find((x) => x.slot.role === ROLES.HEALER)?.entry;
+  const targetDpsKeys = targetEntries
+    .filter((x) => x.slot.role === ROLES.DPS)
+    .map((x) => specKey(x.entry))
+    .sort();
+
+  if (!roster || !targetTank || !targetHealer || targetDpsKeys.length !== 3) return false;
+
+  const rosterTanks = roster.filter((m) => m.role?.toLowerCase() === "tank");
+  const rosterHealers = roster.filter((m) => m.role?.toLowerCase() === "healer");
+  const rosterDps = roster.filter((m) => m.role?.toLowerCase() === "dps");
+
+  // A roster that isn't exactly 1 tank / 1 healer / 3 dps can never match
+  // this app's fixed 5-slot shape.
+  if (rosterTanks.length !== 1 || rosterHealers.length !== 1 || rosterDps.length !== 3) return false;
+
+  if (rosterMemberKey(rosterTanks[0]) !== specKey(targetTank)) return false;
+  if (rosterMemberKey(rosterHealers[0]) !== specKey(targetHealer)) return false;
+
+  const rosterDpsKeys = rosterDps.map(rosterMemberKey).sort();
+  return rosterDpsKeys.every((k, i) => k === targetDpsKeys[i]);
+}
+
+// Raider.IO Lookup panel state — the only async/network feature in this
+// app, so it gets its own small state machine rather than fitting the
+// synchronous "derive everything from `selection`" pattern used elsewhere.
+const raiderIoState = {
+  status: "idle", // "idle" | "scanning" | "done" | "error"
+  message: "",
+  results: [],
+  compKey: null, // fingerprint of the comp these results/status belong to
+};
+// Bumped whenever the comp changes, so an in-flight scan for a stale comp
+// can detect it's been superseded and stop touching shared state, without
+// needing real fetch-cancellation.
+let raiderIoScanToken = 0;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildRaiderIoQueryUrl(page) {
+  const params = new URLSearchParams({
+    season: RAIDER_IO.season,
+    region: RAIDER_IO.region,
+    dungeon: "all",
+    affixes: RAIDER_IO.affixes,
+    page: String(page),
+  });
+  return `${RAIDER_IO.apiBase}?${params}`;
+}
+
+async function fetchRaiderIoPageWithRetry(page, myToken) {
+  const url = buildRaiderIoQueryUrl(page);
+  for (let attempt = 0; attempt <= RAIDER_IO.maxRetries; attempt++) {
+    let response;
+    try {
+      response = await fetch(url);
+    } catch (networkErr) {
+      if (attempt === RAIDER_IO.maxRetries) {
+        throw new Error("Could not reach Raider.IO — check your connection and try again.");
+      }
+      await sleep(RAIDER_IO.retryBaseDelayMs * (attempt + 1));
+      continue;
+    }
+
+    if (response.status === 429) {
+      if (attempt === RAIDER_IO.maxRetries) {
+        throw new Error("Raider.IO rate limit hit — try again in a minute.");
+      }
+      if (myToken === raiderIoScanToken) {
+        raiderIoState.message = `Rate limited by Raider.IO, retrying (${attempt + 1}/${RAIDER_IO.maxRetries})...`;
+        renderRaiderIoResults();
+      }
+      await sleep(RAIDER_IO.retryBaseDelayMs * (attempt + 1));
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Raider.IO returned an error (HTTP ${response.status}).`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data.rankings) ? data.rankings : [];
+  }
+  return [];
+}
+
+async function runRaiderIoLookup() {
+  if (raiderIoState.status === "scanning") return; // overlapping-scan guard
+
+  const targetEntries = getSelectedEntries();
+  if (targetEntries.length !== 5) return; // defensive; button should already be disabled
+
+  raiderIoScanToken++;
+  const myToken = raiderIoScanToken;
+
+  raiderIoState.status = "scanning";
+  raiderIoState.results = [];
+  raiderIoState.compKey = compFingerprint(targetEntries);
+  raiderIoState.message = "Starting scan...";
+  renderRaiderIoResults();
+
+  let runsChecked = 0;
+  try {
+    for (let page = 0; page < RAIDER_IO.maxPagesToScan; page++) {
+      const rankings = await fetchRaiderIoPageWithRetry(page, myToken);
+      if (myToken !== raiderIoScanToken) return; // superseded by a newer scan — abandon silently
+
+      if (rankings.length === 0) break; // ran out of data before hitting the page cap
+
+      runsChecked += rankings.length;
+      rankings.forEach((ranking) => {
+        if (raiderIoState.results.length >= RAIDER_IO.resultsWanted) return;
+        if (rosterMatchesComp(ranking.run.roster, targetEntries)) {
+          raiderIoState.results.push(ranking);
+        }
+      });
+
+      raiderIoState.message = `Checked ${runsChecked} runs across ${page + 1} page(s)... ${raiderIoState.results.length} match(es) found.`;
+      renderRaiderIoResults();
+
+      if (raiderIoState.results.length >= RAIDER_IO.resultsWanted) break;
+
+      await sleep(RAIDER_IO.requestDelayMs);
+      if (myToken !== raiderIoScanToken) return;
+    }
+  } catch (err) {
+    if (myToken !== raiderIoScanToken) return;
+    raiderIoState.status = "error";
+    raiderIoState.message = err.message;
+    renderRaiderIoResults();
+    return;
+  }
+
+  if (myToken !== raiderIoScanToken) return;
+  raiderIoState.status = "done";
+  raiderIoState.message = raiderIoState.results.length
+    ? `Found ${raiderIoState.results.length} matching run(s) out of ${runsChecked} scanned.`
+    : `No matching runs found in ${runsChecked} runs scanned — this comp may just be rare, or try again later.`;
+  renderRaiderIoResults();
+}
+
+// Maps a raider.io roster member back to one of our own SPECS entries (for
+// its icon/colors) — string compatibility between raider.io's class/spec
+// names and ours is confirmed exact, so this is just a lookup. The fallback
+// (empty icon slug) reuses createSpecIcon's existing bad-icon -> initials
+// badge path for free, on the practically-unreachable chance it's not found.
+function raiderIoEntryForRosterMember(member) {
+  const found = SPECS.find(
+    (s) => s.class === member.character.class.name && s.spec === member.character.spec.name
+  );
+  return (
+    found || {
+      class: member.character.class.name,
+      spec: member.character.spec.name,
+      icon: "",
+    }
+  );
+}
+
+// Unofficial URL pattern — raider.io's API doesn't return a run URL. See the
+// comment on RAIDER_IO.runUrlBase in data.js.
+function buildRunUrl(run) {
+  return `${RAIDER_IO.runUrlBase}/${run.season}/${run.keystone_run_id}-${run.dungeon.slug}`;
+}
+
+function formatClearTime(ms) {
+  const totalSeconds = Math.round(ms / 1000);
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const RAIDER_IO_ROLE_SORT_ORDER = { tank: 0, healer: 1, dps: 2 };
+
+function buildRaiderIoResultRow(ranking) {
+  const run = ranking.run;
+  const li = document.createElement("li");
+  li.className = "utility-row raiderio-result-row";
+
+  const header = document.createElement("div");
+  header.className = "raiderio-result-header";
+
+  const dungeonIcon = document.createElement("img");
+  dungeonIcon.className = "raiderio-dungeon-icon";
+  dungeonIcon.src = `${RAIDER_IO.iconCdnBase}${run.dungeon.icon_url}`;
+  dungeonIcon.alt = run.dungeon.name;
+  dungeonIcon.loading = "lazy";
+  dungeonIcon.addEventListener("error", () => dungeonIcon.remove());
+  header.appendChild(dungeonIcon);
+
+  const dungeonName = document.createElement("span");
+  dungeonName.className = "raiderio-dungeon-name";
+  dungeonName.textContent = run.dungeon.name;
+  header.appendChild(dungeonName);
+
+  const level = document.createElement("span");
+  level.className = "raiderio-key-level";
+  level.textContent = `+${run.mythic_level}`;
+  header.appendChild(level);
+
+  const status = document.createElement("span");
+  status.className = "raiderio-run-status";
+  status.textContent =
+    run.num_chests > 0
+      ? `Timed (+${run.num_chests}) — ${formatClearTime(run.clear_time_ms)}`
+      : `Depleted — ${formatClearTime(run.clear_time_ms)}`;
+  header.appendChild(status);
+
+  const score = document.createElement("span");
+  score.className = "raiderio-score";
+  score.textContent = `Score: ${Math.round(ranking.score)}`;
+  header.appendChild(score);
+
+  const date = document.createElement("span");
+  date.className = "raiderio-date";
+  date.textContent = new Date(run.completed_at).toLocaleDateString();
+  header.appendChild(date);
+
+  li.appendChild(header);
+
+  const roster = document.createElement("div");
+  roster.className = "utility-providers raiderio-result-roster";
+  [...run.roster]
+    .sort(
+      (a, b) =>
+        RAIDER_IO_ROLE_SORT_ORDER[a.role?.toLowerCase()] - RAIDER_IO_ROLE_SORT_ORDER[b.role?.toLowerCase()]
+    )
+    .forEach((member) => {
+      const entry = raiderIoEntryForRosterMember(member);
+      const chip = document.createElement("span");
+      chip.className = "utility-provider-chip";
+      chip.appendChild(createSpecIcon(entry, "spec-icon--utility"));
+      const text = document.createElement("span");
+      text.textContent = `${entry.spec} ${entry.class}`;
+      chip.appendChild(text);
+      roster.appendChild(chip);
+    });
+  li.appendChild(roster);
+
+  const link = document.createElement("a");
+  link.className = "raiderio-result-link";
+  link.href = buildRunUrl(run);
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "View run on Raider.IO ↗";
+  li.appendChild(link);
+
+  return li;
+}
+
+function renderRaiderIoResults() {
+  const targetEntries = getSelectedEntries();
+  const allFilled = targetEntries.length === 5;
+  const currentFingerprint = allFilled ? compFingerprint(targetEntries) : null;
+
+  // The comp changed since these results/status were produced — clear them
+  // out and invalidate any scan still running for the old comp, so stale
+  // results for a different composition can never be shown.
+  if (raiderIoState.compKey !== currentFingerprint) {
+    raiderIoScanToken++;
+    raiderIoState.status = "idle";
+    raiderIoState.message = "";
+    raiderIoState.results = [];
+    raiderIoState.compKey = currentFingerprint;
+  }
+
+  const btn = document.getElementById("raiderio-lookup-btn");
+  btn.disabled = !allFilled || raiderIoState.status === "scanning";
+  btn.textContent = raiderIoState.status === "scanning" ? "Scanning..." : "Look up highest keys with this comp";
+
+  const statusEl = document.getElementById("raiderio-status");
+  statusEl.textContent = raiderIoState.message;
+  statusEl.classList.toggle("raiderio-status--error", raiderIoState.status === "error");
+
+  const list = document.getElementById("raiderio-results");
+  list.innerHTML = "";
+  if (raiderIoState.status === "idle") {
+    if (!allFilled) {
+      list.innerHTML = '<li class="empty">Fill all 5 slots to look up matching runs.</li>';
+    }
+    return;
+  }
+  if (raiderIoState.status === "done" && raiderIoState.results.length === 0) {
+    list.innerHTML = '<li class="empty">No matching runs found — try again later, or this comp may just be rare.</li>';
+    return;
+  }
+  raiderIoState.results.forEach((ranking) => list.appendChild(buildRaiderIoResultRow(ranking)));
+}
+
 function renderGroupBuffs() {
   const container = document.getElementById("group-buffs");
   container.innerHTML = "";
@@ -656,6 +965,12 @@ function render() {
   renderCooldownTimeline();
   renderCrowdControl();
   renderUtilityCheck();
+  renderRaiderIoResults();
 }
+
+// Attached once here rather than inside render() — unlike slot icons or
+// table rows, this button is static HTML that's never rebuilt, so it never
+// needs its listener re-attached.
+document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
 
 render();
