@@ -425,8 +425,14 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Which dungeon the Raider.IO Lookup scan is scoped to — "all" or a dungeon
+// slug. Tracked here rather than read from a native <select> (native select
+// popups are OS/browser-rendered and looked broken against this page's dark
+// theme) — the dungeon picker below is a set of plain buttons instead.
+let raiderIoSelectedDungeon = "all";
+
 function getSelectedDungeonSlug() {
-  return document.getElementById("raiderio-dungeon-select").value;
+  return raiderIoSelectedDungeon;
 }
 
 function raiderIoDungeonName(slug) {
@@ -434,18 +440,69 @@ function raiderIoDungeonName(slug) {
   return RAIDER_IO_DUNGEONS.find((d) => d.slug === slug)?.name || slug;
 }
 
-function populateRaiderIoDungeonSelect() {
-  const select = document.getElementById("raiderio-dungeon-select");
-  const allOption = document.createElement("option");
-  allOption.value = "all";
-  allOption.textContent = "All Dungeons";
-  select.appendChild(allOption);
+// Builds an icon element for a dungeon (same fallback-safe pattern as
+// createSpecIcon/createAbilityIcon — tries the real icon, falls back to the
+// dungeon's short name badge on load failure).
+function createDungeonIcon(dungeon, modifierClass) {
+  const wrap = document.createElement("span");
+  wrap.className = `spec-icon ${modifierClass}`;
+
+  const img = document.createElement("img");
+  img.src = `${RAIDER_IO.iconCdnBase}${dungeon.icon_url}`;
+  img.alt = dungeon.name;
+  img.loading = "lazy";
+  img.addEventListener("error", () => {
+    img.remove();
+    wrap.classList.add("fallback");
+    wrap.style.background = "var(--gold)";
+    wrap.textContent = dungeon.shortName;
+  });
+
+  wrap.appendChild(img);
+  return wrap;
+}
+
+function selectRaiderIoDungeon(slug) {
+  raiderIoSelectedDungeon = slug;
+  document.querySelectorAll(".raiderio-dungeon-option").forEach((el) => {
+    el.classList.toggle("selected", el.dataset.slug === slug);
+  });
+  renderRaiderIoResults();
+}
+
+// Built once at startup (not part of render()) — the picker's own options
+// never change, only which one is marked .selected, which selectRaiderIoDungeon
+// handles directly without a full rebuild.
+function buildRaiderIoDungeonPicker() {
+  const container = document.getElementById("raiderio-dungeon-picker");
+
+  const allOption = document.createElement("button");
+  allOption.type = "button";
+  allOption.className = "raiderio-dungeon-option selected";
+  allOption.dataset.slug = "all";
+  allOption.title = "All Dungeons";
+  const allIcon = document.createElement("span");
+  allIcon.className = "spec-icon raiderio-dungeon-option-icon raiderio-dungeon-option-icon--all";
+  allIcon.textContent = "All";
+  allOption.appendChild(allIcon);
+  const allText = document.createElement("span");
+  allText.textContent = "All Dungeons";
+  allOption.appendChild(allText);
+  allOption.addEventListener("click", () => selectRaiderIoDungeon("all"));
+  container.appendChild(allOption);
 
   RAIDER_IO_DUNGEONS.forEach((dungeon) => {
-    const option = document.createElement("option");
-    option.value = dungeon.slug;
-    option.textContent = dungeon.name;
-    select.appendChild(option);
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "raiderio-dungeon-option";
+    option.dataset.slug = dungeon.slug;
+    option.title = dungeon.name;
+    option.appendChild(createDungeonIcon(dungeon, "raiderio-dungeon-option-icon"));
+    const text = document.createElement("span");
+    text.textContent = dungeon.shortName;
+    option.appendChild(text);
+    option.addEventListener("click", () => selectRaiderIoDungeon(dungeon.slug));
+    container.appendChild(option);
   });
 }
 
@@ -686,8 +743,9 @@ function renderRaiderIoResults() {
   btn.disabled = !allFilled || raiderIoState.status === "scanning";
   btn.textContent = raiderIoState.status === "scanning" ? "Scanning..." : "Look up highest keys with this comp";
 
-  const dungeonSelect = document.getElementById("raiderio-dungeon-select");
-  dungeonSelect.disabled = raiderIoState.status === "scanning";
+  document.querySelectorAll(".raiderio-dungeon-option").forEach((el) => {
+    el.disabled = raiderIoState.status === "scanning";
+  });
 
   const statusEl = document.getElementById("raiderio-status");
   statusEl.textContent = raiderIoState.message;
@@ -1009,10 +1067,9 @@ function render() {
 }
 
 // Attached once here rather than inside render() — unlike slot icons or
-// table rows, this button and select are static HTML that's never rebuilt,
-// so they never need their listeners re-attached.
+// table rows, this button is static HTML that's never rebuilt, so it never
+// needs its listener re-attached.
 document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
-document.getElementById("raiderio-dungeon-select").addEventListener("change", renderRaiderIoResults);
-populateRaiderIoDungeonSelect();
+buildRaiderIoDungeonPicker();
 
 render();

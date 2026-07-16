@@ -569,41 +569,67 @@ body {
 
 .raiderio-dungeon-field {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
-.raiderio-dungeon-field label {
+.raiderio-dungeon-label {
   font-size: 0.85rem;
   color: var(--text-dim);
   font-weight: 600;
 }
 
-.raiderio-dungeon-select {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+.raiderio-dungeon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.raiderio-dungeon-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
   background: var(--bg-panel-alt);
-  color: var(--text);
-  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text-dim);
   cursor: pointer;
 }
 
-.raiderio-dungeon-select:hover:not(:disabled) {
+.raiderio-dungeon-option:hover:not(:disabled) {
   border-color: var(--gold);
+  color: var(--text);
 }
 
-.raiderio-dungeon-select:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
+.raiderio-dungeon-option.selected {
+  border-color: var(--gold);
+  background: rgba(240, 192, 64, 0.15);
+  color: var(--text);
+  font-weight: 600;
 }
 
-.raiderio-dungeon-select:disabled {
-  color: var(--text-dim);
+.raiderio-dungeon-option:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
+}
+
+.raiderio-dungeon-option-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-size: 0.4rem;
+}
+
+.raiderio-dungeon-option-icon--all {
+  background: var(--bg-panel);
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.5rem;
 }
 
 .raiderio-status {
