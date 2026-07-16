@@ -319,6 +319,46 @@ function getSelectedEntries() {
   );
 }
 
+function renderGroupBuffs() {
+  const container = document.getElementById("group-buffs");
+  container.innerHTML = "";
+
+  const selected = getSelectedEntries().map((x) => x.entry);
+  if (selected.length === 0) {
+    container.innerHTML = '<p class="empty">Select party members to see their group buffs.</p>';
+    return;
+  }
+
+  // One entry per class that brings a buff — a buff doesn't stack just
+  // because two members of the same class are selected.
+  const seenClasses = new Set();
+  const buffs = [];
+  selected.forEach((entry) => {
+    if (seenClasses.has(entry.class)) return;
+    seenClasses.add(entry.class);
+    const buff = GROUP_BUFF_BY_CLASS[entry.class];
+    if (buff) buffs.push({ entry, buff });
+  });
+
+  if (buffs.length === 0) {
+    container.innerHTML = '<p class="empty">No unique group buffs in this comp yet.</p>';
+    return;
+  }
+
+  const chips = document.createElement("div");
+  chips.className = "cc-chips";
+  buffs.forEach(({ entry, buff }) => {
+    const chip = document.createElement("span");
+    chip.className = "timeline-chip";
+    chip.appendChild(createSpecIcon(entry, "spec-icon--timeline"));
+    const label = document.createElement("span");
+    label.textContent = `${buff} (${entry.class})`;
+    chip.appendChild(label);
+    chips.appendChild(chip);
+  });
+  container.appendChild(chips);
+}
+
 function renderCooldownTimeline() {
   const container = document.getElementById("cooldown-timeline");
   container.innerHTML = "";
@@ -572,6 +612,7 @@ function renderUtilityCheck() {
 
 function render() {
   buildSlots();
+  renderGroupBuffs();
   buildSpecTable();
   renderCooldownTimeline();
   renderCrowdControl();

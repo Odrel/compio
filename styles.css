@@ -89,6 +89,21 @@ body {
   margin: -6px 0 14px;
 }
 
+.panel-subheading {
+  margin: 18px 0 10px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 .slots {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -216,11 +231,6 @@ body {
   font-size: 0.75rem;
   color: var(--text-dim);
   text-align: center;
-}
-
-.utility-check .empty {
-  color: var(--text-dim);
-  font-style: italic;
 }
 
 .timeline-chip {
