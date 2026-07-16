@@ -445,3 +445,26 @@ const RAIDER_IO = {
   maxRetries: 2,
   retryBaseDelayMs: 1000,
 };
+
+// Season-mn-1's 8 Mythic+ dungeons, used to populate the dungeon filter
+// <select> in the Raider.IO Lookup panel (see populateRaiderIoDungeonSelect()
+// in app.js). Sourced from raider.io's static-data API.
+//
+// SEASON-SCOPED, SAME STALENESS CAVEAT AS RAIDER_IO.season ABOVE — this list
+// must be manually replaced with the new season's dungeons whenever
+// RAIDER_IO.season rolls over (next expected: season-mn-2, ~2026-12-16).
+//
+// `slug` is sent as the `dungeon` query param to raider.io's runs API.
+// `icon_url` (kept snake_case to match the API's own field name) is a
+// relative path — same as run results' dungeon icons — must be prefixed
+// with RAIDER_IO.iconCdnBase before use as an <img src>.
+const RAIDER_IO_DUNGEONS = [
+  { slug: "algethar-academy", name: "Algeth'ar Academy", shortName: "AA", icon_url: "/images/wow/icons/large/achievement_dungeon_dragonacademy.jpg" },
+  { slug: "magisters-terrace", name: "Magisters' Terrace", shortName: "MT", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_magistersterrace.jpg" },
+  { slug: "maisara-caverns", name: "Maisara Caverns", shortName: "MC", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_maisarahills.jpg" },
+  { slug: "nexuspoint-xenas", name: "Nexus-Point Xenas", shortName: "NPX", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_voidscararena.jpg" },
+  { slug: "pit-of-saron", name: "Pit of Saron", shortName: "POS", icon_url: "/images/wow/icons/large/achievement_dungeon_icecrown_pitofsaron.jpg" },
+  { slug: "seat-of-the-triumvirate", name: "Seat of the Triumvirate", shortName: "SEAT", icon_url: "/images/wow/icons/large/achievement_boss_triumvirate_darknaaru.jpg" },
+  { slug: "skyreach", name: "Skyreach", shortName: "SR", icon_url: "/images/wow/icons/large/achievement_dungeon_arakkoaspires.jpg" },
+  { slug: "windrunner-spire", name: "Windrunner Spire", shortName: "WS", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_windrunnerspire.jpg" },
+];

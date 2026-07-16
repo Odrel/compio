@@ -407,30 +407,61 @@ const raiderIoState = {
   status: "idle", // "idle" | "scanning" | "done" | "error"
   message: "",
   results: [],
-  compKey: null, // fingerprint of the comp these results/status belong to
+  scopeKey: null, // fingerprint of the comp + selected dungeon these results/status belong to
 };
-// Bumped whenever the comp changes, so an in-flight scan for a stale comp
-// can detect it's been superseded and stop touching shared state, without
-// needing real fetch-cancellation.
+// Bumped whenever the comp or dungeon filter changes, so an in-flight scan
+// for a stale scope can detect it's been superseded and stop touching
+// shared state, without needing real fetch-cancellation.
 let raiderIoScanToken = 0;
+
+// A fingerprint of "what these Raider.IO results are for" — the comp plus
+// the selected dungeon filter. Widening this (vs. comp alone) is what makes
+// changing only the dungeon filter correctly invalidate stale results too.
+function raiderIoScopeKey(targetEntries) {
+  return `${compFingerprint(targetEntries)}::${getSelectedDungeonSlug()}`;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildRaiderIoQueryUrl(page) {
+function getSelectedDungeonSlug() {
+  return document.getElementById("raiderio-dungeon-select").value;
+}
+
+function raiderIoDungeonName(slug) {
+  if (slug === "all") return null;
+  return RAIDER_IO_DUNGEONS.find((d) => d.slug === slug)?.name || slug;
+}
+
+function populateRaiderIoDungeonSelect() {
+  const select = document.getElementById("raiderio-dungeon-select");
+  const allOption = document.createElement("option");
+  allOption.value = "all";
+  allOption.textContent = "All Dungeons";
+  select.appendChild(allOption);
+
+  RAIDER_IO_DUNGEONS.forEach((dungeon) => {
+    const option = document.createElement("option");
+    option.value = dungeon.slug;
+    option.textContent = dungeon.name;
+    select.appendChild(option);
+  });
+}
+
+function buildRaiderIoQueryUrl(page, dungeonSlug) {
   const params = new URLSearchParams({
     season: RAIDER_IO.season,
     region: RAIDER_IO.region,
-    dungeon: "all",
+    dungeon: dungeonSlug,
     affixes: RAIDER_IO.affixes,
     page: String(page),
   });
   return `${RAIDER_IO.apiBase}?${params}`;
 }
 
-async function fetchRaiderIoPageWithRetry(page, myToken) {
-  const url = buildRaiderIoQueryUrl(page);
+async function fetchRaiderIoPageWithRetry(page, myToken, dungeonSlug) {
+  const url = buildRaiderIoQueryUrl(page, dungeonSlug);
   for (let attempt = 0; attempt <= RAIDER_IO.maxRetries; attempt++) {
     let response;
     try {
@@ -471,19 +502,23 @@ async function runRaiderIoLookup() {
   const targetEntries = getSelectedEntries();
   if (targetEntries.length !== 5) return; // defensive; button should already be disabled
 
+  const selectedDungeon = getSelectedDungeonSlug();
+  const dungeonName = raiderIoDungeonName(selectedDungeon);
+  const dungeonPhrase = dungeonName ? ` in ${dungeonName}` : "";
+
   raiderIoScanToken++;
   const myToken = raiderIoScanToken;
 
   raiderIoState.status = "scanning";
   raiderIoState.results = [];
-  raiderIoState.compKey = compFingerprint(targetEntries);
+  raiderIoState.scopeKey = raiderIoScopeKey(targetEntries);
   raiderIoState.message = "Starting scan...";
   renderRaiderIoResults();
 
   let runsChecked = 0;
   try {
     for (let page = 0; page < RAIDER_IO.maxPagesToScan; page++) {
-      const rankings = await fetchRaiderIoPageWithRetry(page, myToken);
+      const rankings = await fetchRaiderIoPageWithRetry(page, myToken, selectedDungeon);
       if (myToken !== raiderIoScanToken) return; // superseded by a newer scan — abandon silently
 
       if (rankings.length === 0) break; // ran out of data before hitting the page cap
@@ -496,7 +531,7 @@ async function runRaiderIoLookup() {
         }
       });
 
-      raiderIoState.message = `Checked ${runsChecked} runs across ${page + 1} page(s)... ${raiderIoState.results.length} match(es) found.`;
+      raiderIoState.message = `Checked ${runsChecked} runs${dungeonPhrase} across ${page + 1} page(s)... ${raiderIoState.results.length} match(es) found.`;
       renderRaiderIoResults();
 
       if (raiderIoState.results.length >= RAIDER_IO.resultsWanted) break;
@@ -515,8 +550,10 @@ async function runRaiderIoLookup() {
   if (myToken !== raiderIoScanToken) return;
   raiderIoState.status = "done";
   raiderIoState.message = raiderIoState.results.length
-    ? `Found ${raiderIoState.results.length} matching run(s) out of ${runsChecked} scanned.`
-    : `No matching runs found in ${runsChecked} runs scanned — this comp may just be rare, or try again later.`;
+    ? `Found ${raiderIoState.results.length} matching run(s)${dungeonPhrase} out of ${runsChecked} scanned.`
+    : `No matching runs found${dungeonPhrase} in ${runsChecked} runs scanned — this comp may just be rare${
+        dungeonName ? " in this dungeon, try All Dungeons for better odds" : ""
+      }, or try again later.`;
   renderRaiderIoResults();
 }
 
@@ -632,22 +669,25 @@ function buildRaiderIoResultRow(ranking) {
 function renderRaiderIoResults() {
   const targetEntries = getSelectedEntries();
   const allFilled = targetEntries.length === 5;
-  const currentFingerprint = allFilled ? compFingerprint(targetEntries) : null;
+  const currentScopeKey = allFilled ? raiderIoScopeKey(targetEntries) : null;
 
-  // The comp changed since these results/status were produced — clear them
-  // out and invalidate any scan still running for the old comp, so stale
-  // results for a different composition can never be shown.
-  if (raiderIoState.compKey !== currentFingerprint) {
+  // The comp or dungeon filter changed since these results/status were
+  // produced — clear them out and invalidate any scan still running for the
+  // old scope, so stale results for a different comp/dungeon can never show.
+  if (raiderIoState.scopeKey !== currentScopeKey) {
     raiderIoScanToken++;
     raiderIoState.status = "idle";
     raiderIoState.message = "";
     raiderIoState.results = [];
-    raiderIoState.compKey = currentFingerprint;
+    raiderIoState.scopeKey = currentScopeKey;
   }
 
   const btn = document.getElementById("raiderio-lookup-btn");
   btn.disabled = !allFilled || raiderIoState.status === "scanning";
   btn.textContent = raiderIoState.status === "scanning" ? "Scanning..." : "Look up highest keys with this comp";
+
+  const dungeonSelect = document.getElementById("raiderio-dungeon-select");
+  dungeonSelect.disabled = raiderIoState.status === "scanning";
 
   const statusEl = document.getElementById("raiderio-status");
   statusEl.textContent = raiderIoState.message;
@@ -969,8 +1009,10 @@ function render() {
 }
 
 // Attached once here rather than inside render() — unlike slot icons or
-// table rows, this button is static HTML that's never rebuilt, so it never
-// needs its listener re-attached.
+// table rows, this button and select are static HTML that's never rebuilt,
+// so they never need their listeners re-attached.
 document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
+document.getElementById("raiderio-dungeon-select").addEventListener("change", renderRaiderIoResults);
+populateRaiderIoDungeonSelect();
 
 render();

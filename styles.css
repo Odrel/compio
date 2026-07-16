@@ -567,6 +567,45 @@ body {
   cursor: not-allowed;
 }
 
+.raiderio-dungeon-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.raiderio-dungeon-field label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.raiderio-dungeon-select {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.raiderio-dungeon-select:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+
+.raiderio-dungeon-select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.raiderio-dungeon-select:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .raiderio-status {
   min-height: 1.2rem;
   color: var(--text-dim);
