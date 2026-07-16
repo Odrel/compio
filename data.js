@@ -20,6 +20,26 @@ const ROLES = {
   DPS: "DPS",
 };
 
+// The site's whole color palette, applied at runtime as CSS custom
+// properties (see applyTheme() in app.js) — edit any value here to reskin
+// the page, no CSS editing needed. Keys match the CSS variable name minus
+// the leading "--" (e.g. "bg-panel" sets --bg-panel).
+const THEME = {
+  "bg": "#0d0f14", // page background
+  "bg-panel": "#171a22", // card/section background
+  "bg-panel-alt": "#1f2430", // slightly lighter panel background (hover states, alt rows)
+  "border": "#363c4d", // dividers and card borders
+  "text": "#f2f1ec", // primary text
+  "text-dim": "#b6bccb", // secondary/muted text
+  "gold": "#f0c040", // accent color — cooldown timers, highlights
+  "tank": "#5b9ee0", // Tank role color
+  "healer": "#4ecb82", // Healer role color
+  "dps": "#e2645f", // DPS role color
+  "profile-cleave": "#4ecb82", // Damage Profile: Cleave pill
+  "profile-funnel": "#b285f5", // Damage Profile: Funnel pill
+  "profile-aoe": "#e2645f", // Damage Profile: AoE pill
+};
+
 // Standard WoW class colors
 const CLASS_COLORS = {
   "Death Knight": "#C41F3B",

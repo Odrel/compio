@@ -1,3 +1,13 @@
+// Applies THEME (data.js) as CSS custom properties on the root element, so
+// the whole palette is editable from data.js without touching any CSS.
+function applyTheme() {
+  const root = document.documentElement.style;
+  Object.entries(THEME).forEach(([name, value]) => {
+    root.setProperty(`--${name}`, value);
+  });
+}
+applyTheme();
+
 const SLOT_DEFS = [
   { id: "tank", label: "Tank", role: ROLES.TANK },
   { id: "healer", label: "Healer", role: ROLES.HEALER },

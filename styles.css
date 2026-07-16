@@ -1,17 +1,23 @@
+/*
+ * These are fallback defaults only — the actual values are set at runtime
+ * from the THEME object in data.js (see applyTheme() in app.js), so this
+ * page never has a build step to reskin. Edit THEME in data.js to change
+ * colors; these values just keep the page looking right before JS runs.
+ */
 :root {
   --bg: #0d0f14;
   --bg-panel: #171a22;
-  --bg-panel-alt: #1e222c;
-  --border: #2c3140;
-  --text: #e8e6e0;
-  --text-dim: #9aa0ad;
+  --bg-panel-alt: #1f2430;
+  --border: #363c4d;
+  --text: #f2f1ec;
+  --text-dim: #b6bccb;
   --gold: #f0c040;
-  --tank: #4a90d9;
-  --healer: #3fbf6f;
-  --dps: #d9534f;
-  --profile-cleave: #3fbf6f;
-  --profile-funnel: #a370f0;
-  --profile-aoe: #d9534f;
+  --tank: #5b9ee0;
+  --healer: #4ecb82;
+  --dps: #e2645f;
+  --profile-cleave: #4ecb82;
+  --profile-funnel: #b285f5;
+  --profile-aoe: #e2645f;
 }
 
 * { box-sizing: border-box; }
