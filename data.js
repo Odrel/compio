@@ -448,13 +448,6 @@ const RAIDER_IO = {
   resultsWanted: 5,
 };
 
-// Keystone.guru's per-dungeon route listing (`{base}/{dungeon slug}`) —
-// verified its dungeon slugs are an exact match to RAIDER_IO_DUNGEONS below,
-// so no separate slug mapping is needed. Used by the Example Routes panel
-// to link out to community-submitted routes; not tied to any specific
-// cached run (Keystone.guru's routes aren't attached to completed runs).
-const KEYSTONE_GURU_ROUTES_BASE = "https://keystone.guru/routes/retail";
-
 // Season-mn-1's 8 Mythic+ dungeons, used to populate the dungeon icon picker
 // in the Raider.IO Lookup panel (see buildRaiderIoDungeonPicker() in
 // app.js). Sourced from raider.io's static-data API.

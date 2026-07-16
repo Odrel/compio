@@ -706,58 +706,6 @@ body {
   text-decoration: underline;
 }
 
-.example-routes-panel summary {
-  cursor: pointer;
-  margin: 0 0 14px;
-  font-size: 1.1rem;
-  color: var(--gold);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-  list-style: none;
-}
-
-.example-routes-panel summary::-webkit-details-marker {
-  display: none;
-}
-
-.example-routes-panel summary::before {
-  content: "▸";
-  display: inline-block;
-  width: 18px;
-  color: var(--text-dim);
-}
-
-.example-routes-panel[open] summary::before {
-  content: "▾";
-}
-
-.example-routes-panel .hint {
-  margin: -6px 0 14px;
-}
-
-.example-routes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.example-routes-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--bg-panel-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--gold);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.example-routes-row:hover {
-  text-decoration: underline;
-}
-
 .raiderio-freshness {
   margin: 10px 0 0;
   text-align: center;

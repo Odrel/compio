@@ -568,27 +568,6 @@ function buildRaiderIoDungeonPicker() {
   });
 }
 
-// Built once at startup, same as buildRaiderIoDungeonPicker() — the list of
-// dungeons never changes. Links out to Keystone.guru's own per-dungeon route
-// listing; not tied to any specific cached run (see KEYSTONE_GURU_ROUTES_BASE
-// in data.js for why).
-function buildExampleRoutesPanel() {
-  const container = document.getElementById("example-routes-list");
-
-  RAIDER_IO_DUNGEONS.forEach((dungeon) => {
-    const row = document.createElement("a");
-    row.className = "example-routes-row";
-    row.href = `${KEYSTONE_GURU_ROUTES_BASE}/${dungeon.slug}`;
-    row.target = "_blank";
-    row.rel = "noopener noreferrer";
-    row.appendChild(createDungeonIcon(dungeon, "spec-icon--utility"));
-    const text = document.createElement("span");
-    text.textContent = dungeon.name;
-    row.appendChild(text);
-    container.appendChild(row);
-  });
-}
-
 async function runRaiderIoLookup() {
   if (raiderIoState.status === "loading") return; // overlapping-load guard
 
@@ -1125,6 +1104,5 @@ function render() {
 // needs its listener re-attached.
 document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
 buildRaiderIoDungeonPicker();
-buildExampleRoutesPanel();
 
 render();
