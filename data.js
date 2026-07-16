@@ -108,7 +108,7 @@ const SPECS = [
   { class: "Monk", spec: "Brewmaster", abbrev: "Brew", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_monk_brewmaster_spec" },
   // Storm, Earth, and Fire was replaced by Zenith. Base cooldown flexes
   // 60/70/80/90s by talent choice — 90s used here as the untalented default.
-  { class: "Monk", spec: "Windwalker", abbrev: "WW", role: ROLES.DPS, cooldownName: "Zenith", cooldownSeconds: 90, damageProfile: ["Funnel"], icon: "spell_monk_windwalker_spec" },
+  { class: "Monk", spec: "Windwalker", abbrev: "WW", role: ROLES.DPS, cooldownName: "Zenith", cooldownSeconds: 60, damageProfile: ["Funnel"], icon: "spell_monk_windwalker_spec" },
   { class: "Monk", spec: "Mistweaver", abbrev: "MW", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_monk_mistweaver_spec" },
 
   { class: "Paladin", spec: "Holy", abbrev: "Holy", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_holy_holybolt" },
@@ -126,7 +126,7 @@ const SPECS = [
   { class: "Rogue", spec: "Subtlety", abbrev: "Sub", role: ROLES.DPS, cooldownName: "Shadow Blades", cooldownSeconds: 90, damageProfile: ["Funnel"], icon: "ability_stealth" },
 
   // Fire Elemental was replaced by Ascendance as Elemental's cooldown.
-  { class: "Shaman", spec: "Elemental", abbrev: "Ele", role: ROLES.DPS, cooldownName: "Ascendance", cooldownSeconds: 180, damageProfile: ["AoE"], icon: "spell_nature_lightning" },
+  { class: "Shaman", spec: "Elemental", abbrev: "Ele", role: ROLES.DPS, cooldownName: "Ascendance", cooldownSeconds: 120, damageProfile: ["AoE"], icon: "spell_nature_lightning" },
   // Feral Spirit was replaced by Doom Winds as Enhancement's signature cooldown.
   { class: "Shaman", spec: "Enhancement", abbrev: "Enh", role: ROLES.DPS, cooldownName: "Doom Winds", cooldownSeconds: 60, damageProfile: ["Cleave"], icon: "spell_shaman_improvedstormstrike" },
   { class: "Shaman", spec: "Restoration", abbrev: "Resto", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_nature_magicimmunity" },
