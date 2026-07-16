@@ -357,13 +357,6 @@ function renderCooldownTimeline() {
     group.appendChild(chips);
 
     container.appendChild(group);
-
-    if (entries.length > 1) {
-      const note = document.createElement("li");
-      note.className = "timeline-note-item";
-      note.textContent = "Same cadence — these can be popped together every pull for stacked burst windows.";
-      container.appendChild(note);
-    }
   });
 }
 

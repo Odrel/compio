@@ -243,13 +243,6 @@ body {
   font-size: 0.4rem;
 }
 
-.timeline-note-item {
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  font-style: italic;
-  padding: 0 10px;
-}
-
 .utility-check {
   list-style: none;
   margin: 0;
