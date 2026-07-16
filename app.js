@@ -485,7 +485,7 @@ function buildUtilityRow({ ok, label, providers, notCoveredText }) {
       providersWrap.appendChild(chip);
     });
     li.appendChild(providersWrap);
-  } else {
+  } else if (notCoveredText) {
     const detail = document.createElement("span");
     detail.className = "detail";
     detail.textContent = notCoveredText;
@@ -644,7 +644,6 @@ function renderUtilityCheck() {
       ok: rezProviders.length > 0,
       label: "Battle Resurrection",
       providers: rezProviders,
-      notCoveredText: "Not covered — consider a Death Knight or Druid.",
     })
   );
 
