@@ -438,17 +438,28 @@ const RAIDER_IO = {
   region: "world", // combines all regions, maximizes match chances
   affixes: "all", // whole season, not just the current week
   resultsWanted: 5,
-  // 40 pages x 20 runs/page = 800 runs scanned max. Raider.io itself caps
+  // 60 pages x 20 runs/page = 1200 runs scanned max. Raider.io itself caps
   // unauthenticated pagination at 100 pages — never raise this above that.
-  maxPagesToScan: 40,
-  requestDelayMs: 150, // spacing between sequential page requests, stays well under 200 req/min
+  maxPagesToScan: 60,
+  // Pages within a batch are fetched concurrently, then the scan pauses
+  // batchDelayMs before starting the next batch. batchSize=5 + 1000ms keeps
+  // the sustained rate around 5 req/1.6s (~190/min), safely under Raider.IO's
+  // 200 req/min limit even accounting for retries.
+  batchSize: 5,
+  batchDelayMs: 1000,
+  requestTimeoutMs: 10000, // hard cap per request attempt, so a hung request can't stall the scan forever
   maxRetries: 2,
   retryBaseDelayMs: 1000,
+  // How long a cached page is considered fresh before being re-fetched. See
+  // the Raider.IO page cache in app.js (loadRaiderIoCache() etc.) — trying
+  // several different comps against the same dungeon scope reuses cached
+  // pages instead of re-hitting the network for each one.
+  cacheTtlMs: 20 * 60 * 1000, // 20 minutes
 };
 
-// Season-mn-1's 8 Mythic+ dungeons, used to populate the dungeon filter
-// <select> in the Raider.IO Lookup panel (see populateRaiderIoDungeonSelect()
-// in app.js). Sourced from raider.io's static-data API.
+// Season-mn-1's 8 Mythic+ dungeons, used to populate the dungeon icon picker
+// in the Raider.IO Lookup panel (see buildRaiderIoDungeonPicker() in
+// app.js). Sourced from raider.io's static-data API.
 //
 // SEASON-SCOPED, SAME STALENESS CAVEAT AS RAIDER_IO.season ABOVE — this list
 // must be manually replaced with the new season's dungeons whenever
