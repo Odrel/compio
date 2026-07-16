@@ -696,6 +696,14 @@ body {
   text-decoration: underline;
 }
 
+.raiderio-freshness {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 .raiderio-attribution {
   margin: 12px 0 0;
   text-align: center;

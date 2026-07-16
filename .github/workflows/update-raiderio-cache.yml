@@ -1,0 +1,46 @@
+name: Update Raider.IO Cache
+
+"on":
+  schedule:
+    - cron: "0 */6 * * *" # every 6 hours
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "scripts/fetch-raiderio-cache.js"
+      - ".github/workflows/update-raiderio-cache.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: raiderio-cache-update
+  cancel-in-progress: false
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch and build Raider.IO cache
+        env:
+          RAIDERIO_API_KEY: ${{ secrets.RAIDERIO_API_KEY }}
+        run: node scripts/fetch-raiderio-cache.js
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "raiderio-cache-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if git status --porcelain | grep -q raiderio-cache.json; then
+            git add raiderio-cache.json
+            git commit -m "Update Raider.IO cache ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+            git push
+          else
+            echo "No changes to raiderio-cache.json — skipping commit."
+          fi

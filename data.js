@@ -413,48 +413,33 @@ function specKey(entry) {
 }
 
 // Config for the Raider.IO Lookup panel (see runRaiderIoLookup() etc. in
-// app.js). Calls raider.io's public Mythic+ Runs API directly from the
-// browser — confirmed CORS is open and no API key is needed at this volume.
+// app.js). The browser no longer calls raider.io's API directly — instead
+// it fetches `datasetUrl`, a large pre-fetched snapshot committed to this
+// repo and refreshed on a schedule by scripts/fetch-raiderio-cache.js /
+// .github/workflows/update-raiderio-cache.yml (see those files for the
+// actual fetching/pagination/rate-limit logic). This keeps the whole
+// dataset build off the critical path of every lookup click.
 //
 // `season` is raider.io's slug for the CURRENT season and WILL GO STALE —
 // raider.io does not auto-roll this. Next expected rollover: season-mn-2
-// around 2026-12-16. If lookups start returning 0 results across many
-// different comps, check this value first.
+// around 2026-12-16. When that happens, update this value AND the season
+// slug hardcoded in scripts/fetch-raiderio-cache.js.
 //
-// `dungeon.icon_url` values returned by the API are relative paths (e.g.
-// "/images/wow/icons/large/xyz.jpg") — they must be prefixed with
-// `iconCdnBase`, not `apiBase`'s host (verified: raider.io's own host 404s
-// on that path, cdn.raiderio.net serves it).
+// `iconCdnBase` is needed because `dungeon.icon_url` values in the dataset
+// are relative paths (e.g. "/images/wow/icons/large/xyz.jpg") that must be
+// prefixed with this host (verified: raider.io's own host 404s on that
+// path, cdn.raiderio.net serves it).
 //
 // `runUrlBase` builds an unofficial, undocumented run-page URL pattern
 // (`{runUrlBase}/{season}/{keystone_run_id}-{dungeon.slug}`) — raider.io's
 // API doesn't return a run URL directly. Verified working against a real
 // run, but could break if raider.io changes their routing.
 const RAIDER_IO = {
-  apiBase: "https://raider.io/api/v1/mythic-plus/runs",
   iconCdnBase: "https://cdn.raiderio.net",
   runUrlBase: "https://raider.io/mythic-plus-runs",
+  datasetUrl: "raiderio-cache.json",
   season: "season-mn-1",
-  region: "world", // combines all regions, maximizes match chances
-  affixes: "all", // whole season, not just the current week
   resultsWanted: 5,
-  // 60 pages x 20 runs/page = 1200 runs scanned max. Raider.io itself caps
-  // unauthenticated pagination at 100 pages — never raise this above that.
-  maxPagesToScan: 60,
-  // Pages within a batch are fetched concurrently, then the scan pauses
-  // batchDelayMs before starting the next batch. batchSize=5 + 1000ms keeps
-  // the sustained rate around 5 req/1.6s (~190/min), safely under Raider.IO's
-  // 200 req/min limit even accounting for retries.
-  batchSize: 5,
-  batchDelayMs: 1000,
-  requestTimeoutMs: 10000, // hard cap per request attempt, so a hung request can't stall the scan forever
-  maxRetries: 2,
-  retryBaseDelayMs: 1000,
-  // How long a cached page is considered fresh before being re-fetched. See
-  // the Raider.IO page cache in app.js (loadRaiderIoCache() etc.) — trying
-  // several different comps against the same dungeon scope reuses cached
-  // pages instead of re-hitting the network for each one.
-  cacheTtlMs: 20 * 60 * 1000, // 20 minutes
 };
 
 // Season-mn-1's 8 Mythic+ dungeons, used to populate the dungeon icon picker
@@ -464,6 +449,9 @@ const RAIDER_IO = {
 // SEASON-SCOPED, SAME STALENESS CAVEAT AS RAIDER_IO.season ABOVE — this list
 // must be manually replaced with the new season's dungeons whenever
 // RAIDER_IO.season rolls over (next expected: season-mn-2, ~2026-12-16).
+// scripts/fetch-raiderio-cache.js keeps its own duplicate DUNGEON_SLUGS
+// array (can't share this one — it's loaded as a global-scope browser
+// script, not a Node module) that needs updating in lockstep too.
 //
 // `slug` is sent as the `dungeon` query param to raider.io's runs API.
 // `icon_url` (kept snake_case to match the API's own field name) is a

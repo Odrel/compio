@@ -400,18 +400,18 @@ function rosterMatchesComp(roster, targetEntries) {
   return rosterDpsKeys.every((k, i) => k === targetDpsKeys[i]);
 }
 
-// Raider.IO Lookup panel state — the only async/network feature in this
-// app, so it gets its own small state machine rather than fitting the
-// synchronous "derive everything from `selection`" pattern used elsewhere.
+// Raider.IO Lookup panel state — the only async feature in this app, so it
+// gets its own small state machine rather than fitting the synchronous
+// "derive everything from `selection`" pattern used elsewhere.
 const raiderIoState = {
-  status: "idle", // "idle" | "scanning" | "done" | "error"
+  status: "idle", // "idle" | "loading" | "done" | "error"
   message: "",
   results: [],
   scopeKey: null, // fingerprint of the comp + selected dungeon these results/status belong to
 };
-// Bumped whenever the comp or dungeon filter changes, so an in-flight scan
-// for a stale scope can detect it's been superseded and stop touching
-// shared state, without needing real fetch-cancellation.
+// Bumped whenever the comp or dungeon filter changes, so an in-flight
+// dataset load for a stale scope can detect it's been superseded and stop
+// touching shared state, without needing real fetch-cancellation.
 let raiderIoScanToken = 0;
 
 // A fingerprint of "what these Raider.IO results are for" — the comp plus
@@ -421,91 +421,59 @@ function raiderIoScopeKey(targetEntries) {
   return `${compFingerprint(targetEntries)}::${getSelectedDungeonSlug()}`;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// The pre-fetched dataset (see RAIDER_IO.datasetUrl in data.js) — a large
+// snapshot of Raider.IO runs refreshed on a schedule by
+// scripts/fetch-raiderio-cache.js / .github/workflows/update-raiderio-cache.yml,
+// committed to the repo and served as a static file by GitHub Pages. Loaded
+// once per session (lazily, on first lookup) and kept in memory — there are
+// no more live per-click calls to raider.io's API at all.
+let raiderIoDataset = null;
+let raiderIoDatasetPromise = null;
 
-// Strips a raider.io ranking down to just the fields this app actually
-// reads (see rosterMatchesComp/buildRaiderIoResultRow/buildRunUrl) — used
-// both for the cache (keeps localStorage small) and in memory generally.
-function trimRanking(ranking) {
-  return {
-    rank: ranking.rank,
-    score: ranking.score,
-    run: {
-      keystone_run_id: ranking.run.keystone_run_id,
-      season: ranking.run.season,
-      mythic_level: ranking.run.mythic_level,
-      clear_time_ms: ranking.run.clear_time_ms,
-      num_chests: ranking.run.num_chests,
-      completed_at: ranking.run.completed_at,
-      dungeon: {
-        name: ranking.run.dungeon.name,
-        slug: ranking.run.dungeon.slug,
-        icon_url: ranking.run.dungeon.icon_url,
-      },
-      roster: ranking.run.roster.map((m) => ({
-        role: m.role,
-        character: {
-          class: { name: m.character.class.name },
-          spec: { name: m.character.spec.name },
-        },
-      })),
-    },
-  };
-}
+async function loadRaiderIoDataset() {
+  if (raiderIoDataset) return raiderIoDataset;
+  if (raiderIoDatasetPromise) return raiderIoDatasetPromise;
 
-// Persistent (localStorage) cache of fetched Raider.IO pages, keyed by
-// "season:dungeonSlug" so a season rollover naturally invalidates old data.
-// This is what makes trying several different comps against the same
-// dungeon scope fast after the first search warms the cache — the raw page
-// data is identical regardless of which comp you're checking it against.
-const RAIDER_IO_CACHE_STORAGE_KEY = "raiderio-cache-v1";
+  raiderIoDatasetPromise = (async () => {
+    let response;
+    try {
+      response = await fetch(RAIDER_IO.datasetUrl);
+    } catch {
+      throw new Error("Could not load Raider.IO data — check your connection and try again.");
+    }
+    if (response.status === 404) {
+      throw new Error("Raider.IO data hasn't been generated yet — check back after the next scheduled update.");
+    }
+    if (!response.ok) {
+      throw new Error(`Raider.IO cache returned an error (HTTP ${response.status}).`);
+    }
+    const dataset = await response.json();
+    raiderIoDataset = dataset;
+    return dataset;
+  })();
 
-function loadRaiderIoCache() {
   try {
-    const raw = localStorage.getItem(RAIDER_IO_CACHE_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {}; // localStorage unavailable (private browsing, quota, etc.) — just don't persist
+    return await raiderIoDatasetPromise;
+  } finally {
+    raiderIoDatasetPromise = null;
   }
 }
 
-function saveRaiderIoCache(cache) {
-  try {
-    localStorage.setItem(RAIDER_IO_CACHE_STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    // Not fatal — the in-memory copy for this session still works, it just won't survive a reload.
+function formatDatasetTimestamp(iso) {
+  return new Date(iso).toLocaleString();
+}
+
+function renderRaiderIoFreshness(dataset) {
+  const el = document.getElementById("raiderio-freshness");
+  if (!dataset) {
+    el.textContent = "";
+    return;
   }
-}
-
-function raiderIoCacheScopeKey(dungeonSlug) {
-  return `${RAIDER_IO.season}:${dungeonSlug}`;
-}
-
-function getCachedRaiderIoPage(cache, dungeonSlug, page) {
-  const entry = cache[raiderIoCacheScopeKey(dungeonSlug)]?.pages?.[page];
-  if (!entry) return null;
-  if (Date.now() - entry.fetchedAt > RAIDER_IO.cacheTtlMs) return null; // stale
-  return entry.rankings;
-}
-
-function setCachedRaiderIoPage(cache, dungeonSlug, page, rankings) {
-  const scopeKey = raiderIoCacheScopeKey(dungeonSlug);
-  if (!cache[scopeKey]) cache[scopeKey] = { pages: {} };
-  cache[scopeKey].pages[page] = { rankings, fetchedAt: Date.now() };
-}
-
-// Drops expired pages before saving, so the cache doesn't grow forever.
-function pruneRaiderIoCache(cache) {
-  const now = Date.now();
-  Object.keys(cache).forEach((scopeKey) => {
-    const pages = cache[scopeKey]?.pages || {};
-    Object.keys(pages).forEach((page) => {
-      if (now - pages[page].fetchedAt > RAIDER_IO.cacheTtlMs) delete pages[page];
-    });
-    if (Object.keys(pages).length === 0) delete cache[scopeKey];
-  });
+  let text = `Data last updated: ${formatDatasetTimestamp(dataset.generatedAt)} (${dataset.runs.length} runs cached)`;
+  if (dataset.season !== RAIDER_IO.season) {
+    text += ` — cached data is for a different season (${dataset.season}); results may be stale.`;
+  }
+  el.textContent = text;
 }
 
 // Which dungeon the Raider.IO Lookup scan is scoped to — "all" or a dungeon
@@ -589,63 +557,8 @@ function buildRaiderIoDungeonPicker() {
   });
 }
 
-function buildRaiderIoQueryUrl(page, dungeonSlug) {
-  const params = new URLSearchParams({
-    season: RAIDER_IO.season,
-    region: RAIDER_IO.region,
-    dungeon: dungeonSlug,
-    affixes: RAIDER_IO.affixes,
-    page: String(page),
-  });
-  return `${RAIDER_IO.apiBase}?${params}`;
-}
-
-async function fetchRaiderIoPageWithRetry(page, myToken, dungeonSlug) {
-  const url = buildRaiderIoQueryUrl(page, dungeonSlug);
-  for (let attempt = 0; attempt <= RAIDER_IO.maxRetries; attempt++) {
-    let response;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), RAIDER_IO.requestTimeoutMs);
-    try {
-      response = await fetch(url, { signal: controller.signal });
-    } catch (networkErr) {
-      if (attempt === RAIDER_IO.maxRetries) {
-        throw new Error(
-          networkErr.name === "AbortError"
-            ? "Raider.IO took too long to respond — try again."
-            : "Could not reach Raider.IO — check your connection and try again."
-        );
-      }
-      await sleep(RAIDER_IO.retryBaseDelayMs * (attempt + 1));
-      continue;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    if (response.status === 429) {
-      if (attempt === RAIDER_IO.maxRetries) {
-        throw new Error("Raider.IO rate limit hit — try again in a minute.");
-      }
-      if (myToken === raiderIoScanToken) {
-        raiderIoState.message = `Rate limited by Raider.IO, retrying (${attempt + 1}/${RAIDER_IO.maxRetries})...`;
-        renderRaiderIoResults();
-      }
-      await sleep(RAIDER_IO.retryBaseDelayMs * (attempt + 1));
-      continue;
-    }
-
-    if (!response.ok) {
-      throw new Error(`Raider.IO returned an error (HTTP ${response.status}).`);
-    }
-
-    const data = await response.json();
-    return Array.isArray(data.rankings) ? data.rankings.map(trimRanking) : [];
-  }
-  return [];
-}
-
 async function runRaiderIoLookup() {
-  if (raiderIoState.status === "scanning") return; // overlapping-scan guard
+  if (raiderIoState.status === "loading") return; // overlapping-load guard
 
   const targetEntries = getSelectedEntries();
   if (targetEntries.length !== 5) return; // defensive; button should already be disabled
@@ -657,80 +570,40 @@ async function runRaiderIoLookup() {
   raiderIoScanToken++;
   const myToken = raiderIoScanToken;
 
-  raiderIoState.status = "scanning";
+  raiderIoState.status = "loading";
   raiderIoState.results = [];
   raiderIoState.scopeKey = raiderIoScopeKey(targetEntries);
-  raiderIoState.message = "Starting scan...";
+  raiderIoState.message = "Loading Raider.IO data...";
   renderRaiderIoResults();
 
-  const cache = loadRaiderIoCache();
-  let runsChecked = 0;
-  let pagesScanned = 0;
+  let dataset;
   try {
-    for (let batchStart = 0; batchStart < RAIDER_IO.maxPagesToScan; batchStart += RAIDER_IO.batchSize) {
-      const batchEnd = Math.min(batchStart + RAIDER_IO.batchSize, RAIDER_IO.maxPagesToScan);
-      const batchPages = [];
-      for (let page = batchStart; page < batchEnd; page++) batchPages.push(page);
-
-      let madeNetworkRequest = false;
-      const batchResults = await Promise.all(
-        batchPages.map(async (page) => {
-          const cached = getCachedRaiderIoPage(cache, selectedDungeon, page);
-          if (cached) return cached;
-          madeNetworkRequest = true;
-          const rankings = await fetchRaiderIoPageWithRetry(page, myToken, selectedDungeon);
-          setCachedRaiderIoPage(cache, selectedDungeon, page, rankings);
-          return rankings;
-        })
-      );
-      if (myToken !== raiderIoScanToken) return; // superseded by a newer scan — abandon silently
-
-      let ranOutOfData = false;
-      for (const rankings of batchResults) {
-        pagesScanned++;
-        if (rankings.length === 0) {
-          ranOutOfData = true; // ran out of data before hitting the page cap
-          break;
-        }
-        runsChecked += rankings.length;
-        rankings.forEach((ranking) => {
-          if (raiderIoState.results.length >= RAIDER_IO.resultsWanted) return;
-          if (rosterMatchesComp(ranking.run.roster, targetEntries)) {
-            raiderIoState.results.push(ranking);
-          }
-        });
-      }
-
-      raiderIoState.message = `Checked ${runsChecked} runs${dungeonPhrase} across ${pagesScanned} page(s)... ${raiderIoState.results.length} match(es) found.`;
-      renderRaiderIoResults();
-
-      pruneRaiderIoCache(cache);
-      saveRaiderIoCache(cache);
-
-      if (ranOutOfData || raiderIoState.results.length >= RAIDER_IO.resultsWanted) break;
-
-      // Only throttle when this batch actually hit the network — an
-      // all-cache batch can move straight to the next one.
-      if (madeNetworkRequest) {
-        await sleep(RAIDER_IO.batchDelayMs);
-        if (myToken !== raiderIoScanToken) return;
-      }
-    }
+    dataset = await loadRaiderIoDataset();
   } catch (err) {
-    if (myToken !== raiderIoScanToken) return;
+    if (myToken !== raiderIoScanToken) return; // superseded by a newer lookup — abandon silently
     raiderIoState.status = "error";
     raiderIoState.message = err.message;
     renderRaiderIoResults();
     return;
   }
-
   if (myToken !== raiderIoScanToken) return;
+
+  const matches = dataset.runs
+    .filter(
+      (r) =>
+        (selectedDungeon === "all" || r.run.dungeon.slug === selectedDungeon) &&
+        rosterMatchesComp(r.run.roster, targetEntries)
+    )
+    .sort((a, b) => b.score - a.score)
+    .slice(0, RAIDER_IO.resultsWanted);
+
   raiderIoState.status = "done";
-  raiderIoState.message = raiderIoState.results.length
-    ? `Found ${raiderIoState.results.length} matching run(s)${dungeonPhrase} out of ${runsChecked} scanned.`
-    : `No matching runs found${dungeonPhrase} in ${runsChecked} runs scanned — this comp may just be rare${
-        dungeonName ? " in this dungeon, try All Dungeons for better odds" : ""
-      }, or try again later.`;
+  raiderIoState.results = matches;
+  raiderIoState.message = matches.length
+    ? `Found ${matches.length} matching run(s)${dungeonPhrase} out of ${dataset.runs.length} runs cached.`
+    : `No matching runs found${dungeonPhrase} out of ${dataset.runs.length} runs cached — this comp may just be rare${
+        dungeonName ? ", try All Dungeons for better odds" : ""
+      }.`;
   renderRaiderIoResults();
 }
 
@@ -860,16 +733,18 @@ function renderRaiderIoResults() {
   }
 
   const btn = document.getElementById("raiderio-lookup-btn");
-  btn.disabled = !allFilled || raiderIoState.status === "scanning";
-  btn.textContent = raiderIoState.status === "scanning" ? "Scanning..." : "Look up highest keys with this comp";
+  btn.disabled = !allFilled || raiderIoState.status === "loading";
+  btn.textContent = raiderIoState.status === "loading" ? "Loading..." : "Look up highest keys with this comp";
 
   document.querySelectorAll(".raiderio-dungeon-option").forEach((el) => {
-    el.disabled = raiderIoState.status === "scanning";
+    el.disabled = raiderIoState.status === "loading";
   });
 
   const statusEl = document.getElementById("raiderio-status");
   statusEl.textContent = raiderIoState.message;
   statusEl.classList.toggle("raiderio-status--error", raiderIoState.status === "error");
+
+  renderRaiderIoFreshness(raiderIoDataset);
 
   const list = document.getElementById("raiderio-results");
   list.innerHTML = "";
