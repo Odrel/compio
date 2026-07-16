@@ -565,7 +565,7 @@ function buildCrowdControlSection({ label, instances, notCoveredText }) {
       chip.className = "timeline-chip";
       chip.appendChild(createAbilityIcon(ability.name, "spec-icon--timeline"));
       const chipLabel = document.createElement("span");
-      chipLabel.textContent = `${ability.name} (${specInitials(entry.spec)})`;
+      chipLabel.textContent = `${ability.name} (${entry.abbrev || specInitials(entry.spec)})`;
       chip.appendChild(chipLabel);
       chips.appendChild(chip);
     });
