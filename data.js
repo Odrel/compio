@@ -61,83 +61,86 @@ const CLASS_COLORS = {
 // cooldowns specifically), and also for Devourer's Void Metamorphosis, which
 // has no fixed cooldown in 12.0.7 — it's gated by Soul Fragments instead.
 //
-// `damageProfile` is the spec's reputation-based M+ damage shape — Single
-// Target, Cleave (strong on 2-3 targets), Funnel (hybrid: prioritizes one
-// target while spreading some damage), or AoE (strong on big pulls). This is
-// a general community reputation, not a hard rule — talents/gear can shift
-// a spec's actual profile mid-season. null for Tank/Healer specs.
+// `damageProfile` is the spec's reputation-based M+ damage shape — an array
+// of one or more of: Cleave (strong on 2-3 targets), Funnel (hybrid:
+// prioritizes one target while spreading some damage), or AoE (strong on
+// big pulls). Some specs straddle two shapes depending on talents (e.g.
+// Retribution flexing between Cleave and Funnel builds) — list every profile
+// that applies. This is a general community reputation, not a hard rule —
+// talents/gear can shift a spec's actual profile mid-season. null for
+// Tank/Healer specs.
 //
 // `abbrev` is the short spec label shown in the Crowd Control panel's chips
 // (e.g. "Blind (Sub)"). Edit these freely to whatever shorthand your group
 // actually uses — nothing else in the app depends on the exact string.
 const SPECS = [
   { class: "Death Knight", spec: "Blood", abbrev: "Blood", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_deathknight_bloodpresence" },
-  { class: "Death Knight", spec: "Frost", abbrev: "Frost", role: ROLES.DPS, cooldownName: "Pillar of Frost", cooldownSeconds: 45, damageProfile: "Cleave", icon: "spell_deathknight_frostpresence" },
-  { class: "Death Knight", spec: "Unholy", abbrev: "Unholy", role: ROLES.DPS, cooldownName: "Army of the Dead", cooldownSeconds: 90, damageProfile: "AoE", icon: "spell_deathknight_unholypresence" },
+  { class: "Death Knight", spec: "Frost", abbrev: "Frost", role: ROLES.DPS, cooldownName: "Pillar of Frost", cooldownSeconds: 45, damageProfile: ["Cleave"], icon: "spell_deathknight_frostpresence" },
+  { class: "Death Knight", spec: "Unholy", abbrev: "Unholy", role: ROLES.DPS, cooldownName: "Army of the Dead", cooldownSeconds: 90, damageProfile: ["AoE"], icon: "spell_deathknight_unholypresence" },
 
-  { class: "Demon Hunter", spec: "Havoc", abbrev: "Havoc", role: ROLES.DPS, cooldownName: "Metamorphosis", cooldownSeconds: 120, damageProfile: "AoE", icon: "ability_demonhunter_specdps" },
+  { class: "Demon Hunter", spec: "Havoc", abbrev: "Havoc", role: ROLES.DPS, cooldownName: "Metamorphosis", cooldownSeconds: 120, damageProfile: ["AoE"], icon: "ability_demonhunter_specdps" },
   { class: "Demon Hunter", spec: "Vengeance", abbrev: "Veng", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "ability_demonhunter_spectank" },
-  { class: "Demon Hunter", spec: "Devourer", abbrev: "Devourer", role: ROLES.DPS, cooldownName: "Void Metamorphosis", cooldownSeconds: null, damageProfile: "Cleave", icon: "classicon_demonhunter_void" },
+  { class: "Demon Hunter", spec: "Devourer", abbrev: "Devourer", role: ROLES.DPS, cooldownName: "Void Metamorphosis", cooldownSeconds: null, damageProfile: ["Cleave"], icon: "classicon_demonhunter_void" },
 
-  { class: "Druid", spec: "Balance", abbrev: "Balance", role: ROLES.DPS, cooldownName: "Celestial Alignment", cooldownSeconds: 180, damageProfile: "AoE", icon: "spell_nature_starfall" },
-  { class: "Druid", spec: "Feral", abbrev: "Feral", role: ROLES.DPS, cooldownName: "Berserk", cooldownSeconds: 180, damageProfile: "Funnel", icon: "ability_druid_catform" },
+  { class: "Druid", spec: "Balance", abbrev: "Balance", role: ROLES.DPS, cooldownName: "Celestial Alignment", cooldownSeconds: 180, damageProfile: ["AoE"], icon: "spell_nature_starfall" },
+  { class: "Druid", spec: "Feral", abbrev: "Feral", role: ROLES.DPS, cooldownName: "Berserk", cooldownSeconds: 180, damageProfile: ["Funnel"], icon: "ability_druid_catform" },
   { class: "Druid", spec: "Guardian", abbrev: "Guardian", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "ability_racial_bearform" },
   { class: "Druid", spec: "Restoration", abbrev: "Resto", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_nature_healingtouch" },
 
-  { class: "Evoker", spec: "Devastation", abbrev: "Devo", role: ROLES.DPS, cooldownName: "Dragonrage", cooldownSeconds: 120, damageProfile: "AoE", icon: "classicon_evoker_devastation" },
+  { class: "Evoker", spec: "Devastation", abbrev: "Devo", role: ROLES.DPS, cooldownName: "Dragonrage", cooldownSeconds: 120, damageProfile: ["AoE"], icon: "classicon_evoker_devastation" },
   { class: "Evoker", spec: "Preservation", abbrev: "Pres", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "classicon_evoker_preservation" },
-  { class: "Evoker", spec: "Augmentation", abbrev: "Aug", role: ROLES.DPS, cooldownName: "Breath of Eons", cooldownSeconds: 120, damageProfile: "Funnel", icon: "classicon_evoker_augmentation" },
+  { class: "Evoker", spec: "Augmentation", abbrev: "Aug", role: ROLES.DPS, cooldownName: "Breath of Eons", cooldownSeconds: 120, damageProfile: ["Funnel"], icon: "classicon_evoker_augmentation" },
 
   // Bestial Wrath: tooltip says 90s baseline; some 12.0.7 guide summaries
   // claimed a flat 30s effective cadence via talents — worth an in-game
   // spot-check, using the tooltip value here.
-  { class: "Hunter", spec: "Beast Mastery", abbrev: "BM", role: ROLES.DPS, cooldownName: "Bestial Wrath", cooldownSeconds: 90, damageProfile: "Cleave", icon: "ability_hunter_bestialdiscipline" },
-  { class: "Hunter", spec: "Marksmanship", abbrev: "MM", role: ROLES.DPS, cooldownName: "Trueshot", cooldownSeconds: 120, damageProfile: "Funnel", icon: "ability_hunter_focusedaim" },
+  { class: "Hunter", spec: "Beast Mastery", abbrev: "BM", role: ROLES.DPS, cooldownName: "Bestial Wrath", cooldownSeconds: 90, damageProfile: ["Cleave"], icon: "ability_hunter_bestialdiscipline" },
+  { class: "Hunter", spec: "Marksmanship", abbrev: "MM", role: ROLES.DPS, cooldownName: "Trueshot", cooldownSeconds: 120, damageProfile: ["Funnel"], icon: "ability_hunter_focusedaim" },
   // Coordinated Assault was replaced by Takedown in Midnight.
-  { class: "Hunter", spec: "Survival", abbrev: "SV", role: ROLES.DPS, cooldownName: "Takedown", cooldownSeconds: 90, damageProfile: "Cleave", icon: "ability_hunter_camouflage" },
+  { class: "Hunter", spec: "Survival", abbrev: "SV", role: ROLES.DPS, cooldownName: "Takedown", cooldownSeconds: 90, damageProfile: ["Cleave"], icon: "ability_hunter_camouflage" },
 
-  { class: "Mage", spec: "Arcane", abbrev: "Arcane", role: ROLES.DPS, cooldownName: "Arcane Surge", cooldownSeconds: 90, damageProfile: "Funnel", icon: "spell_holy_magicalsentry" },
-  { class: "Mage", spec: "Fire", abbrev: "Fire", role: ROLES.DPS, cooldownName: "Combustion", cooldownSeconds: 60, damageProfile: "AoE", icon: "spell_fire_firebolt02" },
+  { class: "Mage", spec: "Arcane", abbrev: "Arcane", role: ROLES.DPS, cooldownName: "Arcane Surge", cooldownSeconds: 90, damageProfile: ["Funnel"], icon: "spell_holy_magicalsentry" },
+  { class: "Mage", spec: "Fire", abbrev: "Fire", role: ROLES.DPS, cooldownName: "Combustion", cooldownSeconds: 60, damageProfile: ["AoE"], icon: "spell_fire_firebolt02" },
   // Icy Veins was removed in Midnight and replaced by Ray of Frost as Frost's
   // signature cooldown, tied to the new Freezing mechanic.
-  { class: "Mage", spec: "Frost", abbrev: "Frost", role: ROLES.DPS, cooldownName: "Ray of Frost", cooldownSeconds: 60, damageProfile: "Cleave", icon: "spell_frost_frostbolt02" },
+  { class: "Mage", spec: "Frost", abbrev: "Frost", role: ROLES.DPS, cooldownName: "Ray of Frost", cooldownSeconds: 60, damageProfile: ["Cleave"], icon: "spell_frost_frostbolt02" },
 
   { class: "Monk", spec: "Brewmaster", abbrev: "Brew", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_monk_brewmaster_spec" },
   // Storm, Earth, and Fire was replaced by Zenith. Base cooldown flexes
   // 60/70/80/90s by talent choice — 90s used here as the untalented default.
-  { class: "Monk", spec: "Windwalker", abbrev: "WW", role: ROLES.DPS, cooldownName: "Zenith", cooldownSeconds: 90, damageProfile: "Funnel", icon: "spell_monk_windwalker_spec" },
+  { class: "Monk", spec: "Windwalker", abbrev: "WW", role: ROLES.DPS, cooldownName: "Zenith", cooldownSeconds: 90, damageProfile: ["Funnel"], icon: "spell_monk_windwalker_spec" },
   { class: "Monk", spec: "Mistweaver", abbrev: "MW", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_monk_mistweaver_spec" },
 
   { class: "Paladin", spec: "Holy", abbrev: "Holy", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_holy_holybolt" },
   { class: "Paladin", spec: "Protection", abbrev: "Prot", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "ability_paladin_shieldofthetemplar" },
-  { class: "Paladin", spec: "Retribution", abbrev: "Ret", role: ROLES.DPS, cooldownName: "Avenging Wrath", cooldownSeconds: 120, damageProfile: "Cleave", icon: "spell_holy_auraoflight" },
+  { class: "Paladin", spec: "Retribution", abbrev: "Ret", role: ROLES.DPS, cooldownName: "Avenging Wrath", cooldownSeconds: 120, damageProfile: ["Cleave", "Funnel"], icon: "spell_holy_auraoflight" },
 
   { class: "Priest", spec: "Discipline", abbrev: "Disc", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_holy_powerwordshield" },
   { class: "Priest", spec: "Holy", abbrev: "Holy", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_holy_guardianspirit" },
   // Dark Ascension was replaced by Voidform as Shadow's signature cooldown.
-  { class: "Priest", spec: "Shadow", abbrev: "Shadow", role: ROLES.DPS, cooldownName: "Voidform", cooldownSeconds: 120, damageProfile: "AoE", icon: "spell_shadow_shadowwordpain" },
+  { class: "Priest", spec: "Shadow", abbrev: "Shadow", role: ROLES.DPS, cooldownName: "Voidform", cooldownSeconds: 120, damageProfile: ["AoE"], icon: "spell_shadow_shadowwordpain" },
 
   // Vendetta was renamed Deathmark in Midnight.
-  { class: "Rogue", spec: "Assassination", abbrev: "Assa", role: ROLES.DPS, cooldownName: "Deathmark", cooldownSeconds: 120, damageProfile: "Funnel", icon: "ability_rogue_deadlybrew" },
-  { class: "Rogue", spec: "Outlaw", abbrev: "Outlaw", role: ROLES.DPS, cooldownName: "Adrenaline Rush", cooldownSeconds: 180, damageProfile: "Cleave", icon: "ability_rogue_waylay" },
-  { class: "Rogue", spec: "Subtlety", abbrev: "Sub", role: ROLES.DPS, cooldownName: "Shadow Blades", cooldownSeconds: 90, damageProfile: "Funnel", icon: "ability_stealth" },
+  { class: "Rogue", spec: "Assassination", abbrev: "Assa", role: ROLES.DPS, cooldownName: "Deathmark", cooldownSeconds: 120, damageProfile: ["Funnel"], icon: "ability_rogue_deadlybrew" },
+  { class: "Rogue", spec: "Outlaw", abbrev: "Outlaw", role: ROLES.DPS, cooldownName: "Adrenaline Rush", cooldownSeconds: 180, damageProfile: ["Cleave"], icon: "ability_rogue_waylay" },
+  { class: "Rogue", spec: "Subtlety", abbrev: "Sub", role: ROLES.DPS, cooldownName: "Shadow Blades", cooldownSeconds: 90, damageProfile: ["Funnel"], icon: "ability_stealth" },
 
   // Fire Elemental was replaced by Ascendance as Elemental's cooldown.
-  { class: "Shaman", spec: "Elemental", abbrev: "Ele", role: ROLES.DPS, cooldownName: "Ascendance", cooldownSeconds: 180, damageProfile: "AoE", icon: "spell_nature_lightning" },
+  { class: "Shaman", spec: "Elemental", abbrev: "Ele", role: ROLES.DPS, cooldownName: "Ascendance", cooldownSeconds: 180, damageProfile: ["AoE"], icon: "spell_nature_lightning" },
   // Feral Spirit was replaced by Doom Winds as Enhancement's signature cooldown.
-  { class: "Shaman", spec: "Enhancement", abbrev: "Enh", role: ROLES.DPS, cooldownName: "Doom Winds", cooldownSeconds: 60, damageProfile: "Cleave", icon: "spell_shaman_improvedstormstrike" },
+  { class: "Shaman", spec: "Enhancement", abbrev: "Enh", role: ROLES.DPS, cooldownName: "Doom Winds", cooldownSeconds: 60, damageProfile: ["Cleave"], icon: "spell_shaman_improvedstormstrike" },
   { class: "Shaman", spec: "Restoration", abbrev: "Resto", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_nature_magicimmunity" },
 
-  { class: "Warlock", spec: "Affliction", abbrev: "Aff", role: ROLES.DPS, cooldownName: "Summon Darkglare", cooldownSeconds: 120, damageProfile: "Funnel", icon: "spell_shadow_deathcoil" },
-  { class: "Warlock", spec: "Demonology", abbrev: "Demo", role: ROLES.DPS, cooldownName: "Summon Demonic Tyrant", cooldownSeconds: 60, damageProfile: "AoE", icon: "spell_shadow_metamorphosis" },
-  { class: "Warlock", spec: "Destruction", abbrev: "Destro", role: ROLES.DPS, cooldownName: "Summon Infernal", cooldownSeconds: 120, damageProfile: "AoE", icon: "spell_shadow_rainoffire" },
+  { class: "Warlock", spec: "Affliction", abbrev: "Aff", role: ROLES.DPS, cooldownName: "Summon Darkglare", cooldownSeconds: 120, damageProfile: ["Funnel"], icon: "spell_shadow_deathcoil" },
+  { class: "Warlock", spec: "Demonology", abbrev: "Demo", role: ROLES.DPS, cooldownName: "Summon Demonic Tyrant", cooldownSeconds: 60, damageProfile: ["AoE"], icon: "spell_shadow_metamorphosis" },
+  { class: "Warlock", spec: "Destruction", abbrev: "Destro", role: ROLES.DPS, cooldownName: "Summon Infernal", cooldownSeconds: 120, damageProfile: ["AoE"], icon: "spell_shadow_rainoffire" },
 
   // Avatar lost its follow-on talents in Midnight and is now a minor
   // cooldown; Colossus Smash (synced with Avatar via Anger Management) is
   // Arms' real signature burst button now. Exact base CD unconfirmed across
   // sources — 45s used here, worth an in-game spot-check.
-  { class: "Warrior", spec: "Arms", abbrev: "Arms", role: ROLES.DPS, cooldownName: "Colossus Smash", cooldownSeconds: 45, damageProfile: "Cleave", icon: "ability_warrior_savageblow" },
-  { class: "Warrior", spec: "Fury", abbrev: "Fury", role: ROLES.DPS, cooldownName: "Recklessness", cooldownSeconds: 90, damageProfile: "AoE", icon: "ability_warrior_innerrage" },
+  { class: "Warrior", spec: "Arms", abbrev: "Arms", role: ROLES.DPS, cooldownName: "Colossus Smash", cooldownSeconds: 45, damageProfile: ["Cleave"], icon: "ability_warrior_savageblow" },
+  { class: "Warrior", spec: "Fury", abbrev: "Fury", role: ROLES.DPS, cooldownName: "Recklessness", cooldownSeconds: 90, damageProfile: ["AoE"], icon: "ability_warrior_innerrage" },
   { class: "Warrior", spec: "Protection", abbrev: "Prot", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "ability_warrior_defensivestance" },
 ];
 

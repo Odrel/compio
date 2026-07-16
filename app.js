@@ -155,6 +155,21 @@ function showTableMessage(text) {
   }, 2500);
 }
 
+// A spec's damageProfile (data.js) is an array of one or more profiles
+// (e.g. Retribution is both Cleave and Funnel) — builds one pill per entry,
+// wrapped so they sit side by side and wrap onto a new line if needed.
+function buildDamageProfilePills(profiles) {
+  const wrap = document.createElement("span");
+  wrap.className = "damage-profile-pills";
+  profiles.forEach((profile) => {
+    const pill = document.createElement("span");
+    pill.className = `damage-profile-pill ${profile}`;
+    pill.textContent = profile;
+    wrap.appendChild(pill);
+  });
+  return wrap;
+}
+
 function buildSlots() {
   const container = document.getElementById("slots");
   container.innerHTML = "";
@@ -197,10 +212,7 @@ function buildSlots() {
     slotEl.appendChild(caption);
 
     if (entry && entry.damageProfile) {
-      const pill = document.createElement("span");
-      pill.className = `damage-profile-pill ${entry.damageProfile}`;
-      pill.textContent = entry.damageProfile;
-      slotEl.appendChild(pill);
+      slotEl.appendChild(buildDamageProfilePills(entry.damageProfile));
     }
 
     container.appendChild(slotEl);
@@ -279,10 +291,7 @@ function buildSpecTable() {
 
       const damageProfileCell = document.createElement("td");
       if (entry.damageProfile) {
-        const pill = document.createElement("span");
-        pill.className = `damage-profile-pill ${entry.damageProfile}`;
-        pill.textContent = entry.damageProfile;
-        damageProfileCell.appendChild(pill);
+        damageProfileCell.appendChild(buildDamageProfilePills(entry.damageProfile));
       } else {
         damageProfileCell.textContent = "—";
         damageProfileCell.classList.add("muted");

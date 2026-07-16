@@ -430,6 +430,16 @@ body {
   border-radius: 10px;
 }
 
+.damage-profile-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.slot .damage-profile-pills {
+  justify-content: center;
+}
+
 .damage-profile-pill {
   display: inline-block;
   font-size: 0.7rem;
