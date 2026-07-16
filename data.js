@@ -339,6 +339,51 @@ const AOE_DISRUPT_ABILITIES = {
   ],
 };
 
+// Wowhead icon slug for every ability referenced in HARD_CC_ABILITIES /
+// AOE_DISRUPT_ABILITIES, keyed by ability name — used to show the actual
+// spell icon (rather than the caster's spec icon) in the Crowd Control
+// panel. Same fallback-safe CDN as the spec icons (see ICON_BASE_URL in
+// app.js): a wrong/renamed slug just falls back to an initials badge.
+const ABILITY_ICONS = {
+  "Asphyxiate": "ability_deathknight_asphixiate",
+  "Imprison": "ability_demonhunter_imprison",
+  "Cyclone": "spell_nature_earthbind",
+  "Maim": "ability_druid_mangle-tga",
+  "Sleep Walk": "ability_xavius_dreamsimulacrum",
+  "Freezing Trap": "spell_frost_chainsofice",
+  "Intimidation": "ability_devour",
+  "Polymorph": "spell_nature_polymorph",
+  "Paralysis": "ability_monk_paralysis",
+  "Hammer of Justice": "spell_holy_sealofmight",
+  "Holy Word: Chastise": "spell_holy_chastise",
+  "Mind Control": "spell_shadow_shadowworddominate",
+  "Blind": "spell_shadow_mindsteal",
+  "Sap": "ability_sap",
+  "Hex": "spell_shaman_hex",
+  "Fear": "spell_shadow_possession",
+  "Mortal Coil": "ability_warlock_mortalcoil",
+  "Storm Bolt": "warrior_talent_icon_stormbolt",
+  "Blinding Sleet": "spell_frost_chillingblast",
+  "Chaos Nova": "spell_fire_felfirenova",
+  "Void Nova": "inv_12_voiddh_ability_voidnova",
+  "Sigil of Misery": "ability_demonhunter_sigilofmisery",
+  "Typhoon": "ability_druid_typhoon",
+  "Incapacitating Roar": "ability_druid_demoralizingroar",
+  "Deep Breath": "ability_evoker_deepbreath",
+  "Tail Swipe": "ability_racial_tailswipe",
+  "Binding Shot": "spell_shaman_bindelemental",
+  "Ring of Frost": "spell_frost_ring-of-frost",
+  "Dragon's Breath": "inv_misc_head_dragon_01",
+  "Leg Sweep": "ability_monk_legsweep",
+  "Ring of Peace": "spell_monk_ringofpeace",
+  "Blinding Light": "ability_paladin_blindinglight",
+  "Psychic Scream": "spell_shadow_psychicscream",
+  "Capacitor Totem": "spell_nature_brilliance",
+  "Shadowfury": "ability_warlock_shadowfurytga",
+  "Shockwave": "ability_warrior_shockwave",
+  "Intimidating Shout": "ability_golemthunderclap",
+};
+
 function specKey(entry) {
   return `${entry.class}:${entry.spec}`;
 }

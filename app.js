@@ -105,6 +105,36 @@ function createSpecIcon(entry, modifierClass) {
   return wrap;
 }
 
+// Builds an icon element for an ability (used in the Crowd Control panel,
+// where the ability's own spell icon is shown instead of the caster's spec
+// icon). Same fallback-safe behavior as createSpecIcon.
+function createAbilityIcon(abilityName, modifierClass) {
+  const wrap = document.createElement("span");
+  wrap.className = `spec-icon ${modifierClass}`;
+
+  const iconSlug = ABILITY_ICONS[abilityName];
+  if (!iconSlug) {
+    wrap.classList.add("fallback");
+    wrap.style.background = "var(--gold)";
+    wrap.textContent = specInitials(abilityName);
+    return wrap;
+  }
+
+  const img = document.createElement("img");
+  img.src = `${ICON_BASE_URL}${iconSlug}.jpg`;
+  img.alt = abilityName;
+  img.loading = "lazy";
+  img.addEventListener("error", () => {
+    img.remove();
+    wrap.classList.add("fallback");
+    wrap.style.background = "var(--gold)";
+    wrap.textContent = specInitials(abilityName);
+  });
+
+  wrap.appendChild(img);
+  return wrap;
+}
+
 let messageTimeout = null;
 function showTableMessage(text) {
   const el = document.getElementById("table-message");
@@ -533,9 +563,9 @@ function buildCrowdControlSection({ label, instances, notCoveredText }) {
     groups.get(seconds).forEach(({ entry, ability }) => {
       const chip = document.createElement("span");
       chip.className = "timeline-chip";
-      chip.appendChild(createSpecIcon(entry, "spec-icon--timeline"));
+      chip.appendChild(createAbilityIcon(ability.name, "spec-icon--timeline"));
       const chipLabel = document.createElement("span");
-      chipLabel.textContent = `${entry.spec} ${entry.class} (${ability.name})`;
+      chipLabel.textContent = `${ability.name} (${specInitials(entry.spec)})`;
       chip.appendChild(chipLabel);
       chips.appendChild(chip);
     });
