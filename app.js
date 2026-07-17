@@ -40,6 +40,18 @@ function isRoleFull(role) {
 const collapsedOverride = {};
 const roleWasFull = {};
 
+// Lowercased/trimmed live text from #spec-search-input — "" means no active
+// search (buildSpecTable() falls back to its normal grouped/collapsed view).
+let specSearchQuery = "";
+
+function matchesSpecSearch(entry, query) {
+  return (
+    entry.class.toLowerCase().includes(query) ||
+    entry.spec.toLowerCase().includes(query) ||
+    entry.abbrev.toLowerCase().includes(query)
+  );
+}
+
 function formatCooldown(seconds) {
   if (seconds == null) return "";
   if (seconds % 60 === 0) return `${seconds / 60} min`;
@@ -225,6 +237,9 @@ function buildSpecTable() {
   const tbody = document.getElementById("spec-table-body");
   tbody.innerHTML = "";
 
+  const query = specSearchQuery;
+  let totalMatches = 0;
+
   ROLE_TABLE_ORDER.forEach((role) => {
     const full = isRoleFull(role);
     if (roleWasFull[role] !== full) {
@@ -236,6 +251,16 @@ function buildSpecTable() {
     const filledCount = SLOT_DEFS.filter((s) => s.role === role && selection[s.id] != null).length;
     const totalCount = SLOT_DEFS.filter((s) => s.role === role).length;
 
+    let specsInRole = SPECS.filter((s) => s.role === role).sort((a, b) => a.class.localeCompare(b.class));
+
+    // Party-aware search: a full role can never be added to, so it never
+    // contributes results, regardless of whether its specs match the query.
+    if (query) {
+      specsInRole = full ? [] : specsInRole.filter((entry) => matchesSpecSearch(entry, query));
+      if (specsInRole.length === 0) return; // no matches in this role — skip its header entirely
+      totalMatches += specsInRole.length;
+    }
+
     const groupRow = document.createElement("tr");
     groupRow.className = "role-group-row";
     const groupCell = document.createElement("td");
@@ -243,7 +268,7 @@ function buildSpecTable() {
 
     const chevron = document.createElement("span");
     chevron.className = "role-group-chevron";
-    chevron.textContent = collapsed ? "▸" : "▾";
+    chevron.textContent = collapsed && !query ? "▸" : "▾";
 
     const groupLabel = document.createElement("span");
     groupLabel.className = `role-group-label ${role}`;
@@ -258,14 +283,12 @@ function buildSpecTable() {
     });
     tbody.appendChild(groupRow);
 
-    const specsInRole = SPECS.filter((s) => s.role === role).sort((a, b) => a.class.localeCompare(b.class));
-
     specsInRole.forEach((entry) => {
       const key = specKey(entry);
       const selectedCount = countSelectedKey(key);
       const row = document.createElement("tr");
       row.dataset.key = key;
-      if (collapsed) row.classList.add("row-collapsed");
+      if (collapsed && !query) row.classList.add("row-collapsed");
       if (selectedCount > 0) row.classList.add("selected");
 
       const classCell = document.createElement("td");
@@ -344,6 +367,16 @@ function buildSpecTable() {
       tbody.appendChild(row);
     });
   });
+
+  if (query && totalMatches === 0) {
+    const emptyRow = document.createElement("tr");
+    const emptyCell = document.createElement("td");
+    emptyCell.colSpan = 9;
+    emptyCell.className = "spec-search-empty muted";
+    emptyCell.textContent = "No specs match your search.";
+    emptyRow.appendChild(emptyCell);
+    tbody.appendChild(emptyRow);
+  }
 }
 
 function onSpecRowClick(entry) {
@@ -359,6 +392,12 @@ function onSpecRowClick(entry) {
   }
 
   selection[targetSlot.id] = key;
+
+  // Reset the search so the table returns to its normal grouped view, ready
+  // for the next search.
+  specSearchQuery = "";
+  document.getElementById("spec-search-input").value = "";
+
   render();
 }
 
@@ -1113,5 +1152,12 @@ function render() {
 // needs its listener re-attached.
 document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
 buildRaiderIoDungeonPicker();
+
+// Same "attached once" reasoning — the search input is static HTML. Typing
+// only ever needs to rebuild the spec table, not the whole page.
+document.getElementById("spec-search-input").addEventListener("input", (e) => {
+  specSearchQuery = e.target.value.trim().toLowerCase();
+  buildSpecTable();
+});
 
 render();
