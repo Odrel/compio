@@ -1,13 +1,20 @@
 // Spec data for the Midnight M+ Group Composer.
 //
-// NOTE ON ACCURACY: Updated for WoW Midnight patch 12.0.7, researched via
+// NOTE ON ACCURACY: Originally researched for WoW Midnight patch 12.0.7 via
 // Wowhead spell pages cross-checked against Icy Veins / Method / Maxroll
-// class guides for 12.0.7. A handful of values are talent-variable in-game
-// (Windwalker's Zenith flexes 60/70/80/90s depending on talents; Beast
-// Mastery's Bestial Wrath and Arms' Colossus Smash had conflicting numbers
-// across sources) — these are marked inline and worth a manual spot-check
-// if you need them pixel-perfect. Everything else here reflects the current
-// patch as of the last data refresh.
+// class guides. Spot-checked against patch 12.1 (Curse of Ula'tek, live
+// 2026-08-13) launch notes/class-guide updates: every tracked DPS
+// cooldownName/cooldownSeconds and all Hard CC/AoE Disrupt/Lust/Battle Rez
+// ability names were checked against available 12.1 sources and came back
+// unchanged (several specs got significant rotational reworks — e.g.
+// Marksmanship Hunter, Unholy Death Knight — but not to the specific
+// buttons/timers tracked here), except two corrections applied directly:
+// Colossus Smash (Arms) and Doom Winds (Enhancement) — see their entries
+// below. This was research via public patch notes/guides, not an in-game
+// verification pass — still worth a spot-check if you need it pixel-perfect.
+// A handful of values are talent-variable in-game (Windwalker's Zenith
+// flexes 60/70/80/90s; Enhancement's Doom Winds vs. Ascendance choice) —
+// marked inline.
 //
 // `icon` is the Wowhead/Blizzard icon slug (served from the public
 // wow.zamimg.com icon CDN — see ICON_BASE_URL in app.js). If a slug is ever
@@ -107,7 +114,9 @@ const SPECS = [
 
   { class: "Monk", spec: "Brewmaster", abbrev: "Brew", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_monk_brewmaster_spec" },
   // Storm, Earth, and Fire was replaced by Zenith. Base cooldown flexes
-  // 60/70/80/90s by talent choice — 90s used here as the untalented default.
+  // 60/70/80/90s by talent choice — 60s used here as the baseline (still
+  // accurate per 12.1 sources; comment previously mismatched the stored
+  // value — fixed).
   { class: "Monk", spec: "Windwalker", abbrev: "WW", role: ROLES.DPS, cooldownName: "Zenith", cooldownSeconds: 60, damageProfile: ["Funnel"], icon: "spell_monk_windwalker_spec" },
   { class: "Monk", spec: "Mistweaver", abbrev: "MW", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_monk_mistweaver_spec" },
 
@@ -127,7 +136,11 @@ const SPECS = [
 
   // Fire Elemental was replaced by Ascendance as Elemental's cooldown.
   { class: "Shaman", spec: "Elemental", abbrev: "Ele", role: ROLES.DPS, cooldownName: "Ascendance", cooldownSeconds: 120, damageProfile: ["AoE"], icon: "spell_nature_lightning" },
-  // Feral Spirit was replaced by Doom Winds as Enhancement's signature cooldown.
+  // Feral Spirit was replaced by Doom Winds as Enhancement's signature
+  // cooldown. Patch 12.1: Ascendance became a genuine talent-build
+  // alternative to Doom Winds — 1-minute burst (Doom Winds, used here) vs.
+  // 2-minute burst (Ascendance, 120s) vs. randomized procs (Deeply Rooted
+  // Elements talent). No single value is "correct" for every build.
   { class: "Shaman", spec: "Enhancement", abbrev: "Enh", role: ROLES.DPS, cooldownName: "Doom Winds", cooldownSeconds: 60, damageProfile: ["Cleave"], icon: "spell_shaman_improvedstormstrike" },
   { class: "Shaman", spec: "Restoration", abbrev: "Resto", role: ROLES.HEALER, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "spell_nature_magicimmunity" },
 
@@ -137,9 +150,11 @@ const SPECS = [
 
   // Avatar lost its follow-on talents in Midnight and is now a minor
   // cooldown; Colossus Smash (synced with Avatar via Anger Management) is
-  // Arms' real signature burst button now. Exact base CD unconfirmed across
-  // sources — 45s used here, worth an in-game spot-check.
-  { class: "Warrior", spec: "Arms", abbrev: "Arms", role: ROLES.DPS, cooldownName: "Colossus Smash", cooldownSeconds: 45, damageProfile: ["Cleave"], icon: "ability_warrior_savageblow" },
+  // Arms' real signature burst button now. Previously 45s here (flagged
+  // unconfirmed); corrected to 30s per patch 12.1 tooltip sources
+  // ("30 second cooldown, lasts 8 seconds") — still worth an in-game
+  // spot-check if you need it pixel-perfect.
+  { class: "Warrior", spec: "Arms", abbrev: "Arms", role: ROLES.DPS, cooldownName: "Colossus Smash", cooldownSeconds: 30, damageProfile: ["Cleave"], icon: "ability_warrior_savageblow" },
   { class: "Warrior", spec: "Fury", abbrev: "Fury", role: ROLES.DPS, cooldownName: "Recklessness", cooldownSeconds: 90, damageProfile: ["AoE"], icon: "ability_warrior_innerrage" },
   { class: "Warrior", spec: "Protection", abbrev: "Prot", role: ROLES.TANK, cooldownName: null, cooldownSeconds: null, damageProfile: null, icon: "ability_warrior_defensivestance" },
 ];
