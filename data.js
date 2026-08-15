@@ -430,9 +430,14 @@ function specKey(entry) {
 // {name,icon_url} object) — look those up from RAIDER_IO_DUNGEONS below.
 //
 // `season` is raider.io's slug for the CURRENT season and WILL GO STALE —
-// raider.io does not auto-roll this. Next expected rollover: season-mn-2
-// around 2026-12-16. When that happens, update this value AND the season
-// slug hardcoded in scripts/fetch-raiderio-cache.js.
+// raider.io does not auto-roll this. Rolled over to season-mn-2 for patch
+// 12.1 (Curse of Ula'tek) — confirmed via raider.io's static-data API
+// (expansion_id=11). Mythic+ Season 2 itself opens 2026-08-18; before that
+// date raider.io has ~no real season-mn-2 keystone data yet, so
+// scripts/fetch-raiderio-cache.js's MIN_SANE_TOTAL_RUNS floor is expected
+// to correctly refuse to overwrite the cache until then. When the season
+// rolls over again, update this value AND the season slug hardcoded in
+// scripts/fetch-raiderio-cache.js.
 //
 // `iconCdnBase` is needed because RAIDER_IO_DUNGEONS' `icon_url` values are
 // relative paths (e.g. "/images/wow/icons/large/xyz.jpg") that must be
@@ -447,32 +452,38 @@ const RAIDER_IO = {
   iconCdnBase: "https://cdn.raiderio.net",
   runUrlBase: "https://raider.io/mythic-plus-runs",
   datasetUrl: "raiderio-cache.json.gz",
-  season: "season-mn-1",
+  season: "season-mn-2",
   resultsWanted: 5,
 };
 
-// Season-mn-1's 8 Mythic+ dungeons, used to populate the dungeon icon picker
+// Season-mn-2's 8 Mythic+ dungeons, used to populate the dungeon icon picker
 // in the Raider.IO Lookup panel (see buildRaiderIoDungeonPicker() in
-// app.js). Sourced from raider.io's static-data API.
+// app.js). Sourced from raider.io's static-data API
+// (https://raider.io/api/v1/mythic-plus/static-data?expansion_id=11) —
+// the entire Season 1 pool was retired for patch 12.1; none of the old
+// dungeons carry over. New: Altar of Fangs. Returning from earlier in
+// Midnight (not in Season 1's M+ pool): Den of Nalorakk, Murder Row, The
+// Blinding Vale, Voidscar Arena. Legacy: Kings' Rest, Temple of Sethraliss
+// (BfA), Ruby Life Pools (Dragonflight).
 //
 // SEASON-SCOPED, SAME STALENESS CAVEAT AS RAIDER_IO.season ABOVE — this list
 // must be manually replaced with the new season's dungeons whenever
-// RAIDER_IO.season rolls over (next expected: season-mn-2, ~2026-12-16).
-// scripts/fetch-raiderio-cache.js keeps its own duplicate DUNGEON_SLUGS
-// array (can't share this one — it's loaded as a global-scope browser
-// script, not a Node module) that needs updating in lockstep too.
+// RAIDER_IO.season rolls over. scripts/fetch-raiderio-cache.js keeps its
+// own duplicate DUNGEON_SLUGS array (can't share this one — it's loaded as
+// a global-scope browser script, not a Node module) that needs updating in
+// lockstep too.
 //
 // `slug` is sent as the `dungeon` query param to raider.io's runs API.
 // `icon_url` (kept snake_case to match the API's own field name) is a
 // relative path — same as run results' dungeon icons — must be prefixed
 // with RAIDER_IO.iconCdnBase before use as an <img src>.
 const RAIDER_IO_DUNGEONS = [
-  { slug: "algethar-academy", name: "Algeth'ar Academy", shortName: "AA", icon_url: "/images/wow/icons/large/achievement_dungeon_dragonacademy.jpg" },
-  { slug: "magisters-terrace", name: "Magisters' Terrace", shortName: "MT", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_magistersterrace.jpg" },
-  { slug: "maisara-caverns", name: "Maisara Caverns", shortName: "MC", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_maisarahills.jpg" },
-  { slug: "nexuspoint-xenas", name: "Nexus-Point Xenas", shortName: "NPX", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_voidscararena.jpg" },
-  { slug: "pit-of-saron", name: "Pit of Saron", shortName: "POS", icon_url: "/images/wow/icons/large/achievement_dungeon_icecrown_pitofsaron.jpg" },
-  { slug: "seat-of-the-triumvirate", name: "Seat of the Triumvirate", shortName: "SEAT", icon_url: "/images/wow/icons/large/achievement_boss_triumvirate_darknaaru.jpg" },
-  { slug: "skyreach", name: "Skyreach", shortName: "SR", icon_url: "/images/wow/icons/large/achievement_dungeon_arakkoaspires.jpg" },
-  { slug: "windrunner-spire", name: "Windrunner Spire", shortName: "WS", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_windrunnerspire.jpg" },
+  { slug: "altar-of-fangs", name: "Altar of Fangs", shortName: "AOF", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_altaroffangs.jpg" },
+  { slug: "den-of-nalorakk", name: "Den of Nalorakk", shortName: "DON", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_proveyourworth.jpg" },
+  { slug: "kings-rest", name: "Kings' Rest", shortName: "KR", icon_url: "/images/wow/icons/large/achievement_dungeon_kingsrest.jpg" },
+  { slug: "murder-row", name: "Murder Row", shortName: "MR", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_murderrow.jpg" },
+  { slug: "ruby-life-pools", name: "Ruby Life Pools", shortName: "RLP", icon_url: "/images/wow/icons/large/achievement_dungeon_lifepools.jpg" },
+  { slug: "temple-of-sethraliss", name: "Temple of Sethraliss", shortName: "TOS", icon_url: "/images/wow/icons/large/achievement_dungeon_templeofsethraliss.jpg" },
+  { slug: "the-blinding-vale", name: "The Blinding Vale", shortName: "BV", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_lightbloom.jpg" },
+  { slug: "voidscar-arena", name: "Voidscar Arena", shortName: "VSA", icon_url: "/images/wow/icons/large/inv_achievement_dungeon_voidscararena.jpg" },
 ];

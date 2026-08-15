@@ -19,21 +19,23 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 
-const SEASON = "season-mn-1";
+const SEASON = "season-mn-2";
 const REGION = "world";
 const AFFIXES = "all";
 const API_BASE = "https://raider.io/api/v1/mythic-plus/runs";
 const OUTPUT_PATH = path.join(__dirname, "..", "raiderio-cache.json.gz");
 
+// Season-mn-2 pool (patch 12.1) — entire Season 1 pool retired, none carry
+// over. Keep in lockstep with RAIDER_IO_DUNGEONS in data.js.
 const DUNGEON_SLUGS = [
-  "algethar-academy",
-  "magisters-terrace",
-  "maisara-caverns",
-  "nexuspoint-xenas",
-  "pit-of-saron",
-  "seat-of-the-triumvirate",
-  "skyreach",
-  "windrunner-spire",
+  "altar-of-fangs",
+  "den-of-nalorakk",
+  "kings-rest",
+  "murder-row",
+  "ruby-life-pools",
+  "temple-of-sethraliss",
+  "the-blinding-vale",
+  "voidscar-arena",
 ];
 
 // raider.io caps pagination at 100 pages/dungeon unauthenticated, 1000 with
