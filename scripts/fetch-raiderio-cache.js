@@ -294,10 +294,17 @@ async function main() {
   }
 
   if (results.length < MIN_SANE_TOTAL_RUNS) {
-    console.error(
-      `Only ${results.length} total runs collected (floor: ${MIN_SANE_TOTAL_RUNS}) — likely a Raider.IO outage or systemic failure. Refusing to overwrite the last-known-good cache.`
+    // Deliberately exit 0, not 1: this is an expected, self-resolving
+    // condition (a Raider.IO outage, or — as with the season-mn-2 rollover —
+    // a brand new season that simply has no keystone data yet), not a bug in
+    // this script. Failing the job here would page/email on every scheduled
+    // run until real data shows up, which is just noise; the file is
+    // intentionally left untouched (not written at all), so the "Commit and
+    // push if changed" step correctly finds nothing to commit and no-ops.
+    console.warn(
+      `Only ${results.length} total runs collected (floor: ${MIN_SANE_TOTAL_RUNS}) — likely a Raider.IO outage, or a new season with no data yet. Leaving the last-known-good cache untouched; not treating this as a failure.`
     );
-    process.exit(1);
+    return;
   }
 
   const generatedAt = new Date().toISOString();
