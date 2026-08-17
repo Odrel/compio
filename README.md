@@ -1,6 +1,6 @@
 # Skoop's Comp Master
 
-Mythic+ group planner for WoW: Midnight - build a 5-player comp, see how your CDs line up and check your buffs and CC coverage, and look up the highest logged keys for it.
+Mythic+ group planner for WoW: Midnight - build a 5-player comp, see how your CDs line up, check your buffs and CC coverage, and look up the highest logged keys for it.
 
 **[Live site →](https://odrel.github.io/compio/)**
 
