@@ -936,8 +936,18 @@ body {
   text-align: right;
 }
 
-.popular-comps-back-btn {
+.popular-comps-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+.popular-comps-actions[hidden] {
+  display: none;
+}
+
+.popular-comps-back-btn {
   padding: 6px 12px;
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -950,6 +960,22 @@ body {
 
 .popular-comps-back-btn:hover {
   border-color: var(--gold);
+}
+
+.popular-comps-use-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gold);
+  background: var(--gold);
+  color: #0d0f14;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.popular-comps-use-btn:hover {
+  filter: brightness(1.08);
 }
 
 .raiderio-freshness {

@@ -1053,6 +1053,26 @@ function backToPopularCompsList() {
   renderRaiderIoPanel();
 }
 
+// Fills all 5 party slots with the currently drilled-into comp's roster.
+// rosterEntries is already in tank/healer/dps/dps/dps order (see
+// orderedRosterEntries), matching SLOT_DEFS, so this is a straight
+// index-to-index assignment. Once all 5 slots are filled, renderRaiderIoPanel
+// switches itself to the exact-match Lookup, so there's nothing else to do
+// here to leave Popular Comps mode.
+function useSelectedComp() {
+  const comp = popularCompsState.selectedComp;
+  if (!comp) return;
+
+  SLOT_DEFS.forEach((slotDef, i) => {
+    selection[slotDef.id] = specKey(comp.rosterEntries[i].entry);
+  });
+
+  specSearchQuery = "";
+  document.getElementById("spec-search-input").value = "";
+
+  render();
+}
+
 async function loadPopularComps(targetEntries) {
   const myToken = popularCompsScanToken;
 
@@ -1563,6 +1583,7 @@ function render() {
 // needs its listener re-attached.
 document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
 document.getElementById("popular-comps-back-btn").addEventListener("click", backToPopularCompsList);
+document.getElementById("popular-comps-use-btn").addEventListener("click", useSelectedComp);
 buildRaiderIoDungeonPicker();
 
 // Same "attached once" reasoning — the search input is static HTML. Typing
