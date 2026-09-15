@@ -554,9 +554,27 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.spec-table th:nth-child(3),
+.spec-table th:nth-child(4),
 .spec-table th:nth-child(5),
-.spec-table th:nth-child(6) {
+.spec-table th:nth-child(6),
+.spec-table th:nth-child(7),
+.spec-table td:nth-child(3),
+.spec-table td:nth-child(4),
+.spec-table td:nth-child(5),
+.spec-table td:nth-child(6),
+.spec-table td:nth-child(7) {
   text-align: center;
+}
+
+.spec-table th:nth-child(3),
+.spec-table th:nth-child(4),
+.spec-table th:nth-child(5),
+.spec-table th:nth-child(6),
+.spec-table th:nth-child(7) {
+  min-width: 56px;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .spec-table td {
@@ -586,7 +604,8 @@ body {
   gap: 4px;
 }
 
-.slot .damage-profile-pills {
+.slot .damage-profile-pills,
+.spec-table .damage-profile-pills {
   justify-content: center;
 }
 
