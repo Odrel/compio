@@ -182,6 +182,24 @@ function buildDamageProfilePills(profiles) {
   return wrap;
 }
 
+// Simple hand-authored glyphs for an empty slot's role — a shield, a cross,
+// and a diagonal "strike" arrow. Plain geometric outline icons (a handful of
+// path points each), not illustration, so hand-authoring them here is fine.
+const ROLE_GLYPH_PATHS = {
+  [ROLES.TANK]: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
+  [ROLES.HEALER]: '<path d="M12 4v16M4 12h16"/>',
+  [ROLES.DPS]: '<path d="M6 18L18 6M9 6h9v9"/>',
+};
+
+function buildRoleGlyph(role) {
+  const wrap = document.createElement("span");
+  wrap.className = "role-glyph";
+  wrap.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${
+    ROLE_GLYPH_PATHS[role] || ""
+  }</svg>`;
+  return wrap;
+}
+
 function buildSlots() {
   const container = document.getElementById("slots");
   container.innerHTML = "";
@@ -215,8 +233,8 @@ function buildSlots() {
       });
     } else {
       icon.classList.add("empty");
-      icon.textContent = slotDef.label[0];
-      caption.textContent = "Empty";
+      icon.appendChild(buildRoleGlyph(slotDef.role));
+      caption.textContent = `Add a ${slotDef.role.toLowerCase()}`;
     }
 
     slotEl.appendChild(label);
@@ -966,9 +984,17 @@ function renderRaiderIoResults() {
   raiderIoState.results.forEach((ranking) => list.appendChild(buildRaiderIoResultRow(ranking)));
 }
 
-function buildPopularCompRow(comp) {
+// `rank` and `maxTeamCount` come from the caller so every row in the list
+// can scale its bar against the same top comp — this is what turns the list
+// into a scannable leaderboard instead of a set of independently-labeled rows.
+function buildPopularCompRow(comp, rank, maxTeamCount) {
   const li = document.createElement("li");
   li.className = "utility-row popular-comp-row";
+
+  const rankEl = document.createElement("div");
+  rankEl.className = "popular-comp-rank";
+  rankEl.textContent = String(rank);
+  li.appendChild(rankEl);
 
   const roster = document.createElement("div");
   roster.className = "utility-providers popular-comp-roster";
@@ -979,16 +1005,33 @@ function buildPopularCompRow(comp) {
   });
   li.appendChild(roster);
 
-  const meta = document.createElement("div");
-  meta.className = "popular-comp-meta";
-  const teams = document.createElement("span");
-  teams.textContent = `${comp.teamCount} team${comp.teamCount === 1 ? "" : "s"}`;
-  meta.appendChild(teams);
+  const barTrack = document.createElement("div");
+  barTrack.className = "popular-comp-bar-track";
+  const barFill = document.createElement("div");
+  barFill.className = "popular-comp-bar-fill";
+  // Floor at a sliver so the lowest-ranked comp's bar is never literally
+  // invisible when it's far behind the top one.
+  const pct = maxTeamCount > 0 ? Math.max(4, (comp.teamCount / maxTeamCount) * 100) : 0;
+  barFill.style.width = `${pct}%`;
+  barTrack.appendChild(barFill);
+  li.appendChild(barTrack);
+
+  const teamStat = document.createElement("div");
+  teamStat.className = "popular-comp-team-stat";
+  const teamNum = document.createElement("div");
+  teamNum.className = "popular-comp-team-num";
+  teamNum.textContent = comp.teamCount;
+  teamStat.appendChild(teamNum);
+  const teamCap = document.createElement("div");
+  teamCap.className = "popular-comp-team-cap";
+  teamCap.textContent = comp.teamCount === 1 ? "team" : "teams";
+  teamStat.appendChild(teamCap);
+  li.appendChild(teamStat);
+
   const best = document.createElement("span");
-  best.className = "raiderio-key-level";
+  best.className = "raiderio-key-level popular-comp-level";
   best.textContent = `+${comp.bestLevel}`;
-  meta.appendChild(best);
-  li.appendChild(meta);
+  li.appendChild(best);
 
   li.addEventListener("click", () => selectPopularComp(comp));
   return li;
@@ -1114,7 +1157,8 @@ function renderPopularComps(targetEntries) {
   statusEl.textContent = `${popularCompsState.comps.length} popular comp${
     popularCompsState.comps.length === 1 ? "" : "s"
   } found — click one to see its runs.`;
-  popularCompsState.comps.forEach((comp) => listEl.appendChild(buildPopularCompRow(comp)));
+  const maxTeamCount = Math.max(...popularCompsState.comps.map((c) => c.teamCount));
+  popularCompsState.comps.forEach((comp, i) => listEl.appendChild(buildPopularCompRow(comp, i + 1, maxTeamCount)));
 }
 
 // Dispatches the Raider.IO panel between its two mutually-exclusive modes:
@@ -1188,6 +1232,23 @@ function renderGroupBuffs() {
   container.appendChild(chips);
 }
 
+// Compact axis-label format for the timeline's tick marks (e.g. "1m30",
+// "3m") — distinct from formatCooldown's "1 min"/"45 sec" (used for each
+// mark's own duration label, matching the rest of the app's convention).
+function formatTimelineTick(seconds) {
+  if (seconds === 0) return "0";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (s === 0) return `${m}m`;
+  return m > 0 ? `${m}m${s}` : `${s}s`;
+}
+
+// Renders DPS cooldowns as markers on an actual 0-3min (or further, if a
+// selected cooldown exceeds that) track, instead of a plain grouped list —
+// so overlapping/clustered burst windows are visible at a glance instead of
+// requiring reading every duration. At most 3 marks ever (one per DPS slot,
+// fewer if specs share a cooldown), each grouping every spec at that exact
+// duration.
 function renderCooldownTimeline() {
   const container = document.getElementById("cooldown-timeline");
   container.innerHTML = "";
@@ -1208,33 +1269,78 @@ function renderCooldownTimeline() {
     groups.get(key).push(entry);
   });
 
-  const sortedKeys = [...groups.keys()].sort((a, b) => a - b);
-  sortedKeys.forEach((seconds) => {
-    const entries = groups.get(seconds);
+  // 180s (3min) covers every cooldown currently in data.js; stretch the
+  // scale further only if a future value ever exceeds it, so a mark is
+  // never plotted past the end of its own track.
+  const trackMax = Math.max(180, ...groups.keys());
 
-    const group = document.createElement("li");
-    group.className = "cc-duration-group";
+  const wrapper = document.createElement("li");
+  wrapper.className = "timeline-visual";
 
-    const duration = document.createElement("div");
-    duration.className = "cc-duration";
-    duration.textContent = formatCooldown(seconds);
-    group.appendChild(duration);
+  const track = document.createElement("div");
+  track.className = "timeline-track";
 
-    const chips = document.createElement("div");
-    chips.className = "cc-chips";
-    entries.forEach((entry) => {
-      const chip = document.createElement("span");
-      chip.className = "timeline-chip";
-      chip.appendChild(createSpecIcon(entry, "spec-icon--timeline"));
-      const label = document.createElement("span");
-      label.textContent = `${entry.spec} ${entry.class} (${entry.cooldownName})`;
-      chip.appendChild(label);
-      chips.appendChild(chip);
+  for (let i = 0; i <= 4; i++) {
+    const seconds = Math.round((trackMax / 4) * i);
+    const pct = (i / 4) * 100;
+    const tick = document.createElement("div");
+    tick.className = "tick";
+    tick.style.left = `${pct}%`;
+    track.appendChild(tick);
+    const tickLabel = document.createElement("div");
+    tickLabel.className = "tick-label";
+    tickLabel.style.left = `${pct}%`;
+    tickLabel.textContent = formatTimelineTick(seconds);
+    track.appendChild(tickLabel);
+  }
+
+  [...groups.keys()]
+    .sort((a, b) => a - b)
+    .forEach((seconds) => {
+      const entries = groups.get(seconds);
+      const pct = (seconds / trackMax) * 100;
+
+      const mark = document.createElement("div");
+      mark.className = "timeline-mark";
+      mark.style.left = `${pct}%`;
+
+      const pins = document.createElement("div");
+      pins.className = "timeline-pins";
+      entries.forEach((entry) => {
+        const pin = document.createElement("span");
+        pin.className = "timeline-pin";
+        pin.appendChild(createSpecIcon(entry, "spec-icon--timeline-pin"));
+        pin.title = `${entry.spec} ${entry.class} (${entry.cooldownName})`;
+        pins.appendChild(pin);
+      });
+      mark.appendChild(pins);
+
+      const stem = document.createElement("div");
+      stem.className = "timeline-stem";
+      mark.appendChild(stem);
+
+      const markLabel = document.createElement("div");
+      markLabel.className = "timeline-mark-label";
+      const durationEl = document.createElement("b");
+      durationEl.textContent = formatCooldown(seconds);
+      markLabel.appendChild(durationEl);
+      entries.forEach((entry) => {
+        // Full "Spec Class" text is too wide when two marks sit close
+        // together on the scale (real overlap with e.g. "Augmentation
+        // Evoker") — the icon + its title tooltip already carry the full
+        // name, so the persistent label only needs the short tag, same as
+        // the Crowd Control chips' convention.
+        const nameEl = document.createElement("div");
+        nameEl.textContent = entry.abbrev || specInitials(entry.spec);
+        markLabel.appendChild(nameEl);
+      });
+      mark.appendChild(markLabel);
+
+      track.appendChild(mark);
     });
-    group.appendChild(chips);
 
-    container.appendChild(group);
-  });
+  wrapper.appendChild(track);
+  container.appendChild(wrapper);
 }
 
 function dedupeEntries(entries) {
