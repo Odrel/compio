@@ -469,6 +469,10 @@ const RAIDER_IO = {
   datasetUrl: "raiderio-cache.json.gz",
   season: "season-mn-2",
   resultsWanted: 5,
+  // How many aggregated comps the Popular Comps view (shown in place of the
+  // exact-match Lookup while the party isn't fully filled — see
+  // renderRaiderIoPanel() in app.js) lists before you have to drill into one.
+  popularCompsWanted: 10,
 };
 
 // Season-mn-2's 8 Mythic+ dungeons, used to populate the dungeon icon picker

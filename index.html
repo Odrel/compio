@@ -51,14 +51,26 @@
 
       <section class="panel raiderio-panel">
         <h2>Raider.IO Lookup</h2>
-        <p class="hint">Find the highest-key logged runs that used this exact 5-player comp (roles and duplicate DPS specs must match).</p>
+        <p id="raiderio-hint" class="hint">Find the highest-key logged runs that used this exact 5-player comp (roles and duplicate DPS specs must match).</p>
         <div class="raiderio-dungeon-field">
           <span class="raiderio-dungeon-label">Dungeon</span>
           <div id="raiderio-dungeon-picker" class="raiderio-dungeon-picker"></div>
         </div>
-        <button id="raiderio-lookup-btn" class="raiderio-lookup-btn" disabled>Look up highest keys with this comp</button>
-        <p id="raiderio-status" class="raiderio-status"></p>
-        <ul id="raiderio-results" class="utility-check raiderio-results"></ul>
+
+        <div id="raiderio-exact-mode">
+          <button id="raiderio-lookup-btn" class="raiderio-lookup-btn" disabled>Look up highest keys with this comp</button>
+          <p id="raiderio-status" class="raiderio-status"></p>
+          <ul id="raiderio-results" class="utility-check raiderio-results"></ul>
+        </div>
+
+        <div id="popular-comps-mode">
+          <p id="popular-comps-status" class="raiderio-status"></p>
+          <div id="popular-comps-back-row" hidden>
+            <button id="popular-comps-back-btn" type="button" class="popular-comps-back-btn">← Back to popular comps</button>
+          </div>
+          <ul id="popular-comps-list" class="utility-check raiderio-results"></ul>
+        </div>
+
         <p id="raiderio-freshness" class="raiderio-freshness"></p>
         <p class="raiderio-attribution">Run data provided by <a href="https://raider.io" target="_blank" rel="noopener noreferrer">Raider.IO</a>.</p>
       </section>

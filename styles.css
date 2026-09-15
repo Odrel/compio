@@ -744,6 +744,45 @@ body {
   text-decoration: underline;
 }
 
+.popular-comp-row {
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.popular-comp-row:hover {
+  background: var(--bg-panel);
+  outline: 1px solid var(--border);
+}
+
+.popular-comp-roster {
+  flex-wrap: nowrap;
+}
+
+.popular-comp-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.popular-comps-back-btn {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.popular-comps-back-btn:hover {
+  border-color: var(--gold);
+}
+
 .raiderio-freshness {
   margin: 10px 0 0;
   text-align: center;

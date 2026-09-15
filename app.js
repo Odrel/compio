@@ -448,6 +448,115 @@ function rosterMatchesComp(roster, targetEntries) {
   return rosterDpsKeys.every((k, i) => k === targetDpsKeys[i]);
 }
 
+// Whether a raider.io run's roster could be reached by filling in the rest
+// of the party around the given PARTIAL selection — every currently-filled
+// slot's spec must be present in the roster. Tank/healer (if selected) must
+// match directly; selected DPS specs are checked as a sub-multiset, so
+// selecting 1x Fire Mage still matches a roster running 2x Fire Mage. Used
+// by the Popular Comps view (app.js's renderPopularComps) whenever the
+// party has 1-4 slots filled; rosterMatchesComp above (exact, all 5 slots)
+// is unchanged and still drives the exact-match Lookup once the party is full.
+function rosterContainsPartialComp(roster, targetEntries) {
+  if (!roster) return false;
+
+  const rosterTanks = roster.filter((m) => m.role?.toLowerCase() === "tank");
+  const rosterHealers = roster.filter((m) => m.role?.toLowerCase() === "healer");
+  const rosterDps = roster.filter((m) => m.role?.toLowerCase() === "dps");
+  if (rosterTanks.length !== 1 || rosterHealers.length !== 1 || rosterDps.length !== 3) return false;
+
+  const targetTank = targetEntries.find((x) => x.slot.role === ROLES.TANK)?.entry;
+  const targetHealer = targetEntries.find((x) => x.slot.role === ROLES.HEALER)?.entry;
+  const targetDpsKeys = targetEntries.filter((x) => x.slot.role === ROLES.DPS).map((x) => specKey(x.entry));
+
+  if (targetTank && rosterMemberKey(rosterTanks[0]) !== specKey(targetTank)) return false;
+  if (targetHealer && rosterMemberKey(rosterHealers[0]) !== specKey(targetHealer)) return false;
+
+  if (targetDpsKeys.length > 0) {
+    const rosterCounts = new Map();
+    rosterDps.forEach((m) => {
+      const k = rosterMemberKey(m);
+      rosterCounts.set(k, (rosterCounts.get(k) || 0) + 1);
+    });
+    const neededCounts = new Map();
+    targetDpsKeys.forEach((k) => neededCounts.set(k, (neededCounts.get(k) || 0) + 1));
+    for (const [k, count] of neededCounts) {
+      if ((rosterCounts.get(k) || 0) < count) return false;
+    }
+  }
+
+  return true;
+}
+
+// Identity of the full 5-spec comp a roster represents (role-aware, so it
+// doesn't collide with a same-specKey-set roster of a different shape —
+// though that can't actually happen since a spec has exactly one role).
+function rosterFingerprint(roster) {
+  const tank = roster.find((m) => m.role?.toLowerCase() === "tank");
+  const healer = roster.find((m) => m.role?.toLowerCase() === "healer");
+  const dpsKeys = roster
+    .filter((m) => m.role?.toLowerCase() === "dps")
+    .map(rosterMemberKey)
+    .sort();
+  return `${rosterMemberKey(tank)}::${rosterMemberKey(healer)}::${dpsKeys.join("|")}`;
+}
+
+// Identity of the 5 actual players in a roster (not the comp) — used to
+// count distinct TEAMS per comp rather than distinct RUNS, so one group
+// farming the same comp across many weeks doesn't inflate its popularity
+// over a comp that many different groups have each logged once.
+function teamFingerprint(roster) {
+  return roster
+    .map((m) => m.character.path || m.character.name || rosterMemberKey(m))
+    .sort()
+    .join("||");
+}
+
+// [{role, entry}] for a roster's tank, healer, then 3 DPS, in that display
+// order — the shape buildPopularCompRow() and buildRaiderIoResultRow() (via
+// raiderIoEntryForRosterMember) both expect for icons/labels.
+function orderedRosterEntries(roster) {
+  return [...roster]
+    .sort((a, b) => RAIDER_IO_ROLE_SORT_ORDER[a.role?.toLowerCase()] - RAIDER_IO_ROLE_SORT_ORDER[b.role?.toLowerCase()])
+    .map((m) => ({ role: m.role, entry: raiderIoEntryForRosterMember(m) }));
+}
+
+// Scans the whole dataset for runs containing the partial selection, and
+// groups the matches into their full 5-spec comps. Ranked by distinct team
+// count (see teamFingerprint) rather than raw run count, then by best score
+// as a tiebreaker.
+function aggregatePopularComps(dataset, targetEntries, dungeonSlug) {
+  const groups = new Map(); // rosterFingerprint -> { rosterEntries, runs, teamKeys }
+
+  for (const ranking of dataset.runs) {
+    const run = ranking.run;
+    if (dungeonSlug !== "all" && run.dungeon !== dungeonSlug) continue;
+    if (!rosterContainsPartialComp(run.roster, targetEntries)) continue;
+
+    const fingerprint = rosterFingerprint(run.roster);
+    let group = groups.get(fingerprint);
+    if (!group) {
+      group = { rosterEntries: orderedRosterEntries(run.roster), runs: [], teamKeys: new Set() };
+      groups.set(fingerprint, group);
+    }
+    group.runs.push(ranking);
+    group.teamKeys.add(teamFingerprint(run.roster));
+  }
+
+  const comps = [...groups.values()].map((g) => {
+    g.runs.sort((a, b) => b.score - a.score);
+    return {
+      rosterEntries: g.rosterEntries,
+      runs: g.runs,
+      teamCount: g.teamKeys.size,
+      bestLevel: g.runs[0]?.run.mythic_level ?? 0,
+      bestScore: g.runs[0]?.score ?? 0,
+    };
+  });
+
+  comps.sort((a, b) => b.teamCount - a.teamCount || b.bestScore - a.bestScore);
+  return comps;
+}
+
 // Raider.IO Lookup panel state — the only async feature in this app, so it
 // gets its own small state machine rather than fitting the synchronous
 // "derive everything from `selection`" pattern used elsewhere.
@@ -465,9 +574,25 @@ let raiderIoScanToken = 0;
 // A fingerprint of "what these Raider.IO results are for" — the comp plus
 // the selected dungeon filter. Widening this (vs. comp alone) is what makes
 // changing only the dungeon filter correctly invalidate stale results too.
+// Works for a partial selection too (compFingerprint doesn't require 5
+// entries), which is what lets the Popular Comps view reuse it as-is.
 function raiderIoScopeKey(targetEntries) {
   return `${compFingerprint(targetEntries)}::${getSelectedDungeonSlug()}`;
 }
+
+// Popular Comps panel state — shown in place of the exact-match Lookup
+// above while the party has 1-4 slots filled (see renderRaiderIoPanel()).
+// Same async-state-machine shape as raiderIoState, plus a `view`/
+// `selectedComp` pair for the list <-> drill-down toggle.
+const popularCompsState = {
+  status: "idle", // "idle" | "loading" | "done" | "error"
+  message: "",
+  comps: [], // aggregated comps for the current partial selection + dungeon
+  view: "list", // "list" | "detail"
+  selectedComp: null, // one entry from `comps`, set when view === "detail"
+  scopeKey: null, // fingerprint (partial comp + dungeon) these results belong to
+};
+let popularCompsScanToken = 0;
 
 // The pre-fetched dataset (see RAIDER_IO.datasetUrl in data.js) — a large,
 // gzip-compressed snapshot of Raider.IO runs refreshed on a schedule by
@@ -577,7 +702,7 @@ function selectRaiderIoDungeon(slug) {
   document.querySelectorAll(".raiderio-dungeon-option").forEach((el) => {
     el.classList.toggle("selected", el.dataset.slug === slug);
   });
-  renderRaiderIoResults();
+  renderRaiderIoPanel();
 }
 
 // Built once at startup (not part of render()) — the picker's own options
@@ -633,7 +758,7 @@ async function runRaiderIoLookup() {
   raiderIoState.results = [];
   raiderIoState.scopeKey = raiderIoScopeKey(targetEntries);
   raiderIoState.message = "Loading Raider.IO data...";
-  renderRaiderIoResults();
+  renderRaiderIoPanel();
 
   let dataset;
   try {
@@ -642,7 +767,7 @@ async function runRaiderIoLookup() {
     if (myToken !== raiderIoScanToken) return; // superseded by a newer lookup — abandon silently
     raiderIoState.status = "error";
     raiderIoState.message = err.message;
-    renderRaiderIoResults();
+    renderRaiderIoPanel();
     return;
   }
   if (myToken !== raiderIoScanToken) return;
@@ -663,7 +788,7 @@ async function runRaiderIoLookup() {
     : `No matching runs found${dungeonPhrase} out of ${dataset.runs.length} runs cached — this comp may just be rare${
         dungeonName ? ", try All Dungeons for better odds" : ""
       }.`;
-  renderRaiderIoResults();
+  renderRaiderIoPanel();
 }
 
 // Maps a raider.io roster member back to one of our own SPECS entries (for
@@ -822,15 +947,9 @@ function renderRaiderIoResults() {
   btn.disabled = !allFilled || raiderIoState.status === "loading";
   btn.textContent = raiderIoState.status === "loading" ? "Loading..." : "Look up highest keys with this comp";
 
-  document.querySelectorAll(".raiderio-dungeon-option").forEach((el) => {
-    el.disabled = raiderIoState.status === "loading";
-  });
-
   const statusEl = document.getElementById("raiderio-status");
   statusEl.textContent = raiderIoState.message;
   statusEl.classList.toggle("raiderio-status--error", raiderIoState.status === "error");
-
-  renderRaiderIoFreshness(raiderIoDataset);
 
   const list = document.getElementById("raiderio-results");
   list.innerHTML = "";
@@ -845,6 +964,188 @@ function renderRaiderIoResults() {
     return;
   }
   raiderIoState.results.forEach((ranking) => list.appendChild(buildRaiderIoResultRow(ranking)));
+}
+
+function buildPopularCompRow(comp) {
+  const li = document.createElement("li");
+  li.className = "utility-row popular-comp-row";
+
+  const roster = document.createElement("div");
+  roster.className = "utility-providers popular-comp-roster";
+  comp.rosterEntries.forEach(({ entry }) => {
+    const icon = createSpecIcon(entry, "spec-icon--utility");
+    icon.title = `${entry.spec} ${entry.class}`;
+    roster.appendChild(icon);
+  });
+  li.appendChild(roster);
+
+  const meta = document.createElement("div");
+  meta.className = "popular-comp-meta";
+  const teams = document.createElement("span");
+  teams.textContent = `${comp.teamCount} team${comp.teamCount === 1 ? "" : "s"}`;
+  meta.appendChild(teams);
+  const best = document.createElement("span");
+  best.className = "raiderio-key-level";
+  best.textContent = `+${comp.bestLevel}`;
+  meta.appendChild(best);
+  li.appendChild(meta);
+
+  li.addEventListener("click", () => selectPopularComp(comp));
+  return li;
+}
+
+function selectPopularComp(comp) {
+  popularCompsState.view = "detail";
+  popularCompsState.selectedComp = comp;
+  renderRaiderIoPanel();
+}
+
+function backToPopularCompsList() {
+  popularCompsState.view = "list";
+  popularCompsState.selectedComp = null;
+  renderRaiderIoPanel();
+}
+
+async function loadPopularComps(targetEntries) {
+  const myToken = popularCompsScanToken;
+
+  let dataset;
+  try {
+    dataset = await loadRaiderIoDataset();
+  } catch (err) {
+    if (myToken !== popularCompsScanToken) return; // superseded by a newer selection — abandon silently
+    popularCompsState.status = "error";
+    popularCompsState.message = err.message;
+    renderRaiderIoPanel();
+    return;
+  }
+  if (myToken !== popularCompsScanToken) return;
+
+  const dungeonSlug = getSelectedDungeonSlug();
+  const comps = aggregatePopularComps(dataset, targetEntries, dungeonSlug).slice(0, RAIDER_IO.popularCompsWanted);
+
+  popularCompsState.status = "done";
+  popularCompsState.comps = comps;
+  renderRaiderIoPanel();
+}
+
+// Renders the Popular Comps view — shown instead of renderRaiderIoResults()
+// while the party has 0-4 slots filled. Mirrors runRaiderIoLookup's
+// load-once-then-filter pattern, but triggers itself on any scope change
+// instead of waiting for a button click (there's nothing to click here —
+// the whole point is that it appears as soon as you've picked a spec).
+function renderPopularComps(targetEntries) {
+  const backRow = document.getElementById("popular-comps-back-row");
+  const statusEl = document.getElementById("popular-comps-status");
+  const listEl = document.getElementById("popular-comps-list");
+
+  if (targetEntries.length === 0) {
+    popularCompsScanToken++; // invalidate any load still in flight for a prior selection
+    popularCompsState.status = "idle";
+    popularCompsState.message = "";
+    popularCompsState.comps = [];
+    popularCompsState.view = "list";
+    popularCompsState.selectedComp = null;
+    popularCompsState.scopeKey = null;
+    backRow.hidden = true;
+    statusEl.textContent = "";
+    statusEl.classList.remove("raiderio-status--error");
+    listEl.innerHTML = '<li class="empty">Add a spec to see the most popular comps built around it.</li>';
+    return;
+  }
+
+  // The selection or dungeon filter changed since these comps were computed
+  // — clear them out and invalidate any load still running for the old
+  // scope, same reasoning as renderRaiderIoResults' scope-change guard.
+  const currentScopeKey = raiderIoScopeKey(targetEntries);
+  if (popularCompsState.scopeKey !== currentScopeKey) {
+    popularCompsScanToken++;
+    popularCompsState.status = "idle";
+    popularCompsState.message = "";
+    popularCompsState.comps = [];
+    popularCompsState.view = "list";
+    popularCompsState.selectedComp = null;
+    popularCompsState.scopeKey = currentScopeKey;
+  }
+
+  if (popularCompsState.status === "idle") {
+    popularCompsState.status = "loading";
+    popularCompsState.message = "Loading Raider.IO data...";
+    loadPopularComps(targetEntries);
+  }
+
+  backRow.hidden = popularCompsState.view !== "detail";
+
+  if (popularCompsState.status === "loading") {
+    statusEl.textContent = popularCompsState.message;
+    statusEl.classList.remove("raiderio-status--error");
+    listEl.innerHTML = "";
+    return;
+  }
+  if (popularCompsState.status === "error") {
+    statusEl.textContent = popularCompsState.message;
+    statusEl.classList.add("raiderio-status--error");
+    listEl.innerHTML = "";
+    return;
+  }
+
+  statusEl.classList.remove("raiderio-status--error");
+  listEl.innerHTML = "";
+
+  if (popularCompsState.view === "detail") {
+    const comp = popularCompsState.selectedComp;
+    const shown = Math.min(RAIDER_IO.resultsWanted, comp.runs.length);
+    statusEl.textContent = `Showing top ${shown} of ${comp.runs.length} run(s) from ${comp.teamCount} team${
+      comp.teamCount === 1 ? "" : "s"
+    }.`;
+    comp.runs.slice(0, RAIDER_IO.resultsWanted).forEach((ranking) => listEl.appendChild(buildRaiderIoResultRow(ranking)));
+    return;
+  }
+
+  // list view
+  if (popularCompsState.comps.length === 0) {
+    const dungeonName = raiderIoDungeonName(getSelectedDungeonSlug());
+    statusEl.textContent = `No comps found with this selection${
+      dungeonName ? ` in ${dungeonName}` : ""
+    } — try All Dungeons or fewer specs.`;
+    listEl.innerHTML = '<li class="empty">No matching comps found.</li>';
+    return;
+  }
+  statusEl.textContent = `${popularCompsState.comps.length} popular comp${
+    popularCompsState.comps.length === 1 ? "" : "s"
+  } found — click one to see its runs.`;
+  popularCompsState.comps.forEach((comp) => listEl.appendChild(buildPopularCompRow(comp)));
+}
+
+// Dispatches the Raider.IO panel between its two mutually-exclusive modes:
+// the exact-match Lookup (renderRaiderIoResults) once all 5 slots are
+// filled, or the Popular Comps browser (renderPopularComps) otherwise.
+// Centralizes the bits both modes share (hint text, dungeon-picker
+// disabling while a load is in flight, the freshness line) so neither
+// mode's renderer has to know about the other.
+function renderRaiderIoPanel() {
+  const targetEntries = getSelectedEntries();
+  const exactMode = targetEntries.length === 5;
+
+  document.getElementById("raiderio-exact-mode").hidden = !exactMode;
+  document.getElementById("popular-comps-mode").hidden = exactMode;
+
+  document.getElementById("raiderio-hint").textContent = exactMode
+    ? "Find the highest-key logged runs that used this exact 5-player comp (roles and duplicate DPS specs must match)."
+    : "See the most popular full comps built around your current picks, or fill all 5 slots to search for an exact comp.";
+
+  if (exactMode) {
+    renderRaiderIoResults();
+  } else {
+    renderPopularComps(targetEntries);
+  }
+
+  const loading = exactMode ? raiderIoState.status === "loading" : popularCompsState.status === "loading";
+  document.querySelectorAll(".raiderio-dungeon-option").forEach((el) => {
+    el.disabled = loading;
+  });
+
+  renderRaiderIoFreshness(raiderIoDataset);
 }
 
 function renderGroupBuffs() {
@@ -1144,13 +1445,14 @@ function render() {
   renderCooldownTimeline();
   renderCrowdControl();
   renderUtilityCheck();
-  renderRaiderIoResults();
+  renderRaiderIoPanel();
 }
 
 // Attached once here rather than inside render() — unlike slot icons or
 // table rows, this button is static HTML that's never rebuilt, so it never
 // needs its listener re-attached.
 document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
+document.getElementById("popular-comps-back-btn").addEventListener("click", backToPopularCompsList);
 buildRaiderIoDungeonPicker();
 
 // Same "attached once" reasoning — the search input is static HTML. Typing
