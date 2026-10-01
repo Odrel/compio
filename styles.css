@@ -610,6 +610,10 @@ input:focus-visible {
   font-size: 0.8rem;
 }
 
+.app-footer-credit {
+  font-weight: 500;
+}
+
 .app-footer code {
   font-family: inherit;
   font-weight: 500;
