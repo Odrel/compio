@@ -113,7 +113,6 @@ body {
 .subtitle {
   color: var(--text-dim);
   margin: 14px 0 0;
-  max-width: 46ch;
 }
 
 .theme-switch {
