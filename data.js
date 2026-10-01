@@ -453,6 +453,10 @@ const RAIDER_IO = {
   // exact-match Lookup while the party isn't fully filled — see
   // renderRaiderIoPanel() in app.js) lists before you have to drill into one.
   popularCompsWanted: 10,
+  // Upper bounds for what "Show more" can reveal, and how many each click adds.
+  popularCompsMax: 50,
+  resultsMax: 50,
+  showMoreStep: 10,
 };
 
 // Season-mn-2's 8 Mythic+ dungeons, used to populate the dungeon icon picker

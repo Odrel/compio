@@ -599,6 +599,7 @@ const raiderIoState = {
   status: "idle", // "idle" | "loading" | "done" | "error"
   message: "",
   results: [],
+  shown: RAIDER_IO.resultsWanted, // how many of `results` are listed (grown by "Show more")
   scopeKey: null, // fingerprint of the comp + selected dungeon these results/status belong to
 };
 // Bumped whenever the comp or dungeon filter changes, so an in-flight
@@ -623,6 +624,8 @@ const popularCompsState = {
   status: "idle", // "idle" | "loading" | "done" | "error"
   message: "",
   comps: [], // aggregated comps for the current partial selection + dungeon
+  shown: RAIDER_IO.popularCompsWanted, // how many of `comps` are listed (grown by "Show more")
+  runsShown: RAIDER_IO.resultsWanted, // how many runs of the drilled-into comp are listed
   view: "list", // "list" | "detail"
   selectedComp: null, // one entry from `comps`, set when view === "detail"
   scopeKey: null, // fingerprint (partial comp + dungeon) these results belong to
@@ -791,6 +794,7 @@ async function runRaiderIoLookup() {
 
   raiderIoState.status = "loading";
   raiderIoState.results = [];
+  raiderIoState.shown = RAIDER_IO.resultsWanted;
   raiderIoState.scopeKey = raiderIoScopeKey(targetEntries);
   raiderIoState.message = "Loading Raider.IO data...";
   renderRaiderIoPanel();
@@ -814,12 +818,12 @@ async function runRaiderIoLookup() {
         rosterMatchesComp(r.run.roster, targetEntries)
     )
     .sort((a, b) => b.score - a.score)
-    .slice(0, RAIDER_IO.resultsWanted);
+    .slice(0, RAIDER_IO.resultsMax);
 
   raiderIoState.status = "done";
   raiderIoState.results = matches;
   raiderIoState.message = matches.length
-    ? `Found ${matches.length} matching run(s)${dungeonPhrase} out of ${dataset.runs.length} runs cached.`
+    ? `${matches.length >= RAIDER_IO.resultsMax ? "Showing the top " : "Found "}${matches.length} matching run(s)${dungeonPhrase} out of ${dataset.runs.length} runs cached.`
     : `No matching runs found${dungeonPhrase} out of ${dataset.runs.length} runs cached — this comp may just be rare${
         dungeonName ? ", try All Dungeons for better odds" : ""
       }.`;
@@ -975,6 +979,7 @@ function renderRaiderIoResults() {
     raiderIoState.status = "idle";
     raiderIoState.message = "";
     raiderIoState.results = [];
+    raiderIoState.shown = RAIDER_IO.resultsWanted;
     raiderIoState.scopeKey = currentScopeKey;
   }
 
@@ -998,7 +1003,26 @@ function renderRaiderIoResults() {
     list.innerHTML = '<li class="empty">No matching runs found — try again later, or this comp may just be rare.</li>';
     return;
   }
-  raiderIoState.results.forEach((ranking) => list.appendChild(buildRaiderIoResultRow(ranking)));
+  raiderIoState.results.slice(0, raiderIoState.shown).forEach((ranking) => list.appendChild(buildRaiderIoResultRow(ranking)));
+  appendShowMore(list, raiderIoState.shown, raiderIoState.results.length, () => {
+    raiderIoState.shown += RAIDER_IO.showMoreStep;
+    renderRaiderIoPanel();
+  });
+}
+
+// Appends a "Show N more" row under a result list when there's more to show.
+// `limit` is how many items exist in total (already capped by the caller).
+function appendShowMore(listEl, shown, limit, onMore) {
+  if (shown >= limit) return;
+  const li = document.createElement("li");
+  li.className = "show-more-row";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "show-more-btn";
+  btn.textContent = `Show ${Math.min(RAIDER_IO.showMoreStep, limit - shown)} more (${shown} of ${limit})`;
+  btn.addEventListener("click", onMore);
+  li.appendChild(btn);
+  listEl.appendChild(li);
 }
 
 // `rank` and `maxTeamCount` come from the caller so every row in the list
@@ -1057,6 +1081,7 @@ function buildPopularCompRow(comp, rank, maxTeamCount) {
 function selectPopularComp(comp) {
   popularCompsState.view = "detail";
   popularCompsState.selectedComp = comp;
+  popularCompsState.runsShown = RAIDER_IO.resultsWanted;
   renderRaiderIoPanel();
 }
 
@@ -1102,7 +1127,7 @@ async function loadPopularComps(targetEntries) {
   if (myToken !== popularCompsScanToken) return;
 
   const dungeonSlug = getSelectedDungeonSlug();
-  const comps = aggregatePopularComps(dataset, targetEntries, dungeonSlug).slice(0, RAIDER_IO.popularCompsWanted);
+  const comps = aggregatePopularComps(dataset, targetEntries, dungeonSlug).slice(0, RAIDER_IO.popularCompsMax);
 
   popularCompsState.status = "done";
   popularCompsState.comps = comps;
@@ -1126,6 +1151,7 @@ function renderPopularComps(targetEntries) {
     popularCompsState.comps = [];
     popularCompsState.view = "list";
     popularCompsState.selectedComp = null;
+    popularCompsState.shown = RAIDER_IO.popularCompsWanted;
     popularCompsState.scopeKey = null;
     backRow.hidden = true;
     statusEl.textContent = "";
@@ -1145,6 +1171,7 @@ function renderPopularComps(targetEntries) {
     popularCompsState.comps = [];
     popularCompsState.view = "list";
     popularCompsState.selectedComp = null;
+    popularCompsState.shown = RAIDER_IO.popularCompsWanted;
     popularCompsState.scopeKey = currentScopeKey;
   }
 
@@ -1174,11 +1201,16 @@ function renderPopularComps(targetEntries) {
 
   if (popularCompsState.view === "detail") {
     const comp = popularCompsState.selectedComp;
-    const shown = Math.min(RAIDER_IO.resultsWanted, comp.runs.length);
+    const runLimit = Math.min(RAIDER_IO.resultsMax, comp.runs.length);
+    const shown = Math.min(popularCompsState.runsShown, runLimit);
     statusEl.textContent = `Showing top ${shown} of ${comp.runs.length} run(s) from ${comp.teamCount} team${
       comp.teamCount === 1 ? "" : "s"
     }.`;
-    comp.runs.slice(0, RAIDER_IO.resultsWanted).forEach((ranking) => listEl.appendChild(buildRaiderIoResultRow(ranking)));
+    comp.runs.slice(0, shown).forEach((ranking) => listEl.appendChild(buildRaiderIoResultRow(ranking)));
+    appendShowMore(listEl, shown, runLimit, () => {
+      popularCompsState.runsShown += RAIDER_IO.showMoreStep;
+      renderRaiderIoPanel();
+    });
     return;
   }
 
@@ -1195,7 +1227,14 @@ function renderPopularComps(targetEntries) {
     popularCompsState.comps.length === 1 ? "" : "s"
   } found — click one to see its runs.`;
   const maxTeamCount = Math.max(...popularCompsState.comps.map((c) => c.teamCount));
-  popularCompsState.comps.forEach((comp, i) => listEl.appendChild(buildPopularCompRow(comp, i + 1, maxTeamCount)));
+  const shownComps = Math.min(popularCompsState.shown, popularCompsState.comps.length);
+  popularCompsState.comps
+    .slice(0, shownComps)
+    .forEach((comp, i) => listEl.appendChild(buildPopularCompRow(comp, i + 1, maxTeamCount)));
+  appendShowMore(listEl, shownComps, popularCompsState.comps.length, () => {
+    popularCompsState.shown += RAIDER_IO.showMoreStep;
+    renderRaiderIoPanel();
+  });
 }
 
 // Dispatches the Raider.IO panel between its two mutually-exclusive modes:
