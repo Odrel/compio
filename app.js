@@ -178,11 +178,10 @@ function buildDamageProfilePills(profiles) {
 const ROLE_GLYPH_PATHS = {
   [ROLES.TANK]: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
   [ROLES.HEALER]: '<path d="M12 4v16M4 12h16"/>',
-  // Sword: pointed tip + blade, then a narrower crossguard and short grip
-  // (vs. the Healer cross's single centered, full-width bar) so the two
-  // stay easy to tell apart at a glance despite sharing the same line-icon
-  // style.
-  [ROLES.DPS]: '<path d="M9 6L12 3L15 6M12 3V16"/><path d="M8 16H16M12 16V20"/>',
+  // Diagonal sword (blade outline, guard, grip) — the tilt keeps it distinct
+  // from the upright shield and cross.
+  [ROLES.DPS]:
+    '<path d="M8.9 12.9L16.9 4.9L20.5 3.5L19.1 7.1L11.1 15.1Z"/><path d="M6 12L12 18"/><path d="M9 15L4.6 19.4"/>',
 };
 
 function buildRoleGlyph(role) {
@@ -243,6 +242,10 @@ function buildSlots() {
   });
 }
 
+// Long class names are shortened in the spec table; the full name stays as a
+// hover title. Search still matches the full name (see matchesSpecSearch).
+const CLASS_ABBREV = { "Death Knight": "DK", "Demon Hunter": "DH" };
+
 const ROLE_TABLE_ORDER = [ROLES.TANK, ROLES.HEALER, ROLES.DPS];
 
 function buildSpecTable() {
@@ -278,16 +281,30 @@ function buildSpecTable() {
     const groupCell = document.createElement("td");
     groupCell.colSpan = 9;
 
+    const groupHead = document.createElement("div");
+    groupHead.className = `role-group-head ${role}`;
+
+    const groupBadge = document.createElement("span");
+    groupBadge.className = "role-group-badge";
+    groupBadge.appendChild(buildRoleGlyph(role));
+
+    const groupLabel = document.createElement("span");
+    groupLabel.className = "role-group-label";
+    groupLabel.textContent = role;
+
+    const groupCount = document.createElement("span");
+    groupCount.className = "role-group-count";
+    groupCount.textContent = `${filledCount} / ${totalCount}`;
+
     const chevron = document.createElement("span");
     chevron.className = "role-group-chevron";
     chevron.textContent = collapsed && !query ? "▸" : "▾";
 
-    const groupLabel = document.createElement("span");
-    groupLabel.className = `role-group-label ${role}`;
-    groupLabel.textContent = `${role} (${filledCount}/${totalCount})`;
-
-    groupCell.appendChild(chevron);
-    groupCell.appendChild(groupLabel);
+    groupHead.appendChild(groupBadge);
+    groupHead.appendChild(groupLabel);
+    groupHead.appendChild(groupCount);
+    groupHead.appendChild(chevron);
+    groupCell.appendChild(groupHead);
     groupRow.appendChild(groupCell);
     groupRow.addEventListener("click", () => {
       collapsedOverride[role] = !collapsed;
@@ -310,7 +327,8 @@ function buildSpecTable() {
       classDot.className = "class-dot";
       classDot.style.background = CLASS_COLORS[entry.class] || "var(--text-dim)";
       classCellInner.appendChild(classDot);
-      classCellInner.appendChild(document.createTextNode(entry.class));
+      classCellInner.appendChild(document.createTextNode(CLASS_ABBREV[entry.class] || entry.class));
+      if (CLASS_ABBREV[entry.class]) classCellInner.title = entry.class;
       classCell.appendChild(classCellInner);
 
       const specCell = document.createElement("td");
