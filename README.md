@@ -23,6 +23,7 @@ The Raider.IO panel never calls Raider.IO from your browser. A [GitHub Action](.
 ## Keeping data current
 
 - **Class/spec balance** → [`data.js`](data.js) (accuracy note at the top says what's verified against which patch)
+- **Colors and fonts** → the `:root` tokens at the top of [`styles.css`](styles.css) (light palette, plus a dark override that the header switch toggles)
 - **Dungeon rotation / season** → `RAIDER_IO_DUNGEONS` in `data.js` + `DUNGEON_SLUGS` in `scripts/fetch-raiderio-cache.js` - update both together at every season rollover
 
 ## Built with AI

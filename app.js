@@ -1,13 +1,3 @@
-// Applies THEME (data.js) as CSS custom properties on the root element, so
-// the whole palette is editable from data.js without touching any CSS.
-function applyTheme() {
-  const root = document.documentElement.style;
-  Object.entries(THEME).forEach(([name, value]) => {
-    root.setProperty(`--${name}`, value);
-  });
-}
-applyTheme();
-
 const SLOT_DEFS = [
   { id: "tank", label: "Tank", role: ROLES.TANK },
   { id: "healer", label: "Healer", role: ROLES.HEALER },
@@ -137,7 +127,7 @@ function createAbilityIcon(abilityName, modifierClass) {
   const iconSlug = ABILITY_ICONS[abilityName];
   if (!iconSlug) {
     wrap.classList.add("fallback");
-    wrap.style.background = "var(--gold)";
+    wrap.style.background = "var(--accent)";
     wrap.textContent = specInitials(abilityName);
     return wrap;
   }
@@ -149,7 +139,7 @@ function createAbilityIcon(abilityName, modifierClass) {
   img.addEventListener("error", () => {
     img.remove();
     wrap.classList.add("fallback");
-    wrap.style.background = "var(--gold)";
+    wrap.style.background = "var(--accent)";
     wrap.textContent = specInitials(abilityName);
   });
 
@@ -314,9 +304,14 @@ function buildSpecTable() {
       if (selectedCount > 0) row.classList.add("selected");
 
       const classCell = document.createElement("td");
-      classCell.textContent = entry.class;
-      classCell.style.color = CLASS_COLORS[entry.class] || "inherit";
-      classCell.style.fontWeight = "600";
+      const classCellInner = document.createElement("span");
+      classCellInner.className = "class-cell-inner";
+      const classDot = document.createElement("span");
+      classDot.className = "class-dot";
+      classDot.style.background = CLASS_COLORS[entry.class] || "var(--text-dim)";
+      classCellInner.appendChild(classDot);
+      classCellInner.appendChild(document.createTextNode(entry.class));
+      classCell.appendChild(classCellInner);
 
       const specCell = document.createElement("td");
       specCell.className = "spec-cell";
@@ -711,7 +706,7 @@ function createDungeonIcon(dungeon, modifierClass) {
   img.addEventListener("error", () => {
     img.remove();
     wrap.classList.add("fallback");
-    wrap.style.background = "var(--gold)";
+    wrap.style.background = "var(--accent)";
     wrap.textContent = dungeon.shortName;
   });
 
@@ -1594,3 +1589,30 @@ document.getElementById("spec-search-input").addEventListener("input", (e) => {
 });
 
 render();
+
+// Light/dark switch. index.html's inline script has already applied any saved
+// choice before first paint; this just toggles and persists it.
+(function setupThemeSwitch() {
+  const root = document.documentElement;
+  const button = document.getElementById("theme-switch");
+  const label = document.getElementById("theme-switch-label");
+
+  function effectiveTheme() {
+    const set = root.getAttribute("data-theme");
+    if (set === "dark" || set === "light") return set;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function paintLabel() {
+    label.textContent = effectiveTheme() === "dark" ? "Light mode" : "Dark mode";
+  }
+
+  button.addEventListener("click", () => {
+    const next = effectiveTheme() === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("cm-theme", next);
+    } catch (e) {}
+    paintLabel();
+  });
+  paintLabel();
+})();
