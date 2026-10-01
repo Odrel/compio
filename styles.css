@@ -10,7 +10,7 @@
   --bg-panel-alt: #ede8e0;
   --border: #d9d2c7;
   --text: #1f1b18;
-  --text-dim: #7c7268;
+  --text-dim: #564d44;
   --accent: #c2410c;
   --on-accent: #ffffff;
   --accent-tint: rgba(194, 65, 12, 0.1);
@@ -32,7 +32,7 @@
     --bg-panel-alt: #27231f;
     --border: #3a342e;
     --text: #f3efe8;
-    --text-dim: #a59c90;
+    --text-dim: #c4bbae;
     --accent: #e8702a;
     --on-accent: #161412;
     --accent-tint: rgba(232, 112, 42, 0.14);
@@ -52,7 +52,7 @@
   --bg-panel-alt: #27231f;
   --border: #3a342e;
   --text: #f3efe8;
-  --text-dim: #a59c90;
+  --text-dim: #c4bbae;
   --accent: #e8702a;
   --on-accent: #161412;
   --accent-tint: rgba(232, 112, 42, 0.14);
