@@ -783,7 +783,7 @@ async function runRaiderIoLookup() {
   if (raiderIoState.status === "loading") return; // overlapping-load guard
 
   const targetEntries = getSelectedEntries();
-  if (targetEntries.length !== 5) return; // defensive; button should already be disabled
+  if (targetEntries.length !== 5) return; // defensive; only called once all 5 slots are filled
 
   const selectedDungeon = getSelectedDungeonSlug();
   const dungeonName = raiderIoDungeonName(selectedDungeon);
@@ -983,9 +983,13 @@ function renderRaiderIoResults() {
     raiderIoState.scopeKey = currentScopeKey;
   }
 
-  const btn = document.getElementById("raiderio-lookup-btn");
-  btn.disabled = !allFilled || raiderIoState.status === "loading";
-  btn.textContent = raiderIoState.status === "loading" ? "Loading..." : "Look up highest keys with this comp";
+  // Same as the Popular Comps view: look up as soon as the scope (comp or
+  // dungeon) is known, no button press needed. runRaiderIoLookup re-renders
+  // the panel itself once it flips status to "loading".
+  if (allFilled && raiderIoState.status === "idle") {
+    runRaiderIoLookup();
+    return;
+  }
 
   const statusEl = document.getElementById("raiderio-status");
   statusEl.textContent = raiderIoState.message;
@@ -993,12 +997,7 @@ function renderRaiderIoResults() {
 
   const list = document.getElementById("raiderio-results");
   list.innerHTML = "";
-  if (raiderIoState.status === "idle") {
-    if (!allFilled) {
-      list.innerHTML = '<li class="empty">Fill all 5 slots to look up matching runs.</li>';
-    }
-    return;
-  }
+  if (raiderIoState.status === "idle") return;
   if (raiderIoState.status === "done" && raiderIoState.results.length === 0) {
     list.innerHTML = '<li class="empty">No matching runs found — try again later, or this comp may just be rare.</li>';
     return;
@@ -1633,7 +1632,6 @@ function render() {
 // Attached once here rather than inside render() — unlike slot icons or
 // table rows, this button is static HTML that's never rebuilt, so it never
 // needs its listener re-attached.
-document.getElementById("raiderio-lookup-btn").addEventListener("click", runRaiderIoLookup);
 document.getElementById("popular-comps-back-btn").addEventListener("click", backToPopularCompsList);
 document.getElementById("popular-comps-use-btn").addEventListener("click", useSelectedComp);
 buildRaiderIoDungeonPicker();

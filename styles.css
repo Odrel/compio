@@ -903,32 +903,6 @@ input:focus-visible {
   font-size: 0.75rem;
 }
 
-.raiderio-lookup-btn {
-  width: 100%;
-  padding: 12px 16px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-family: inherit;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-weight: 700;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.raiderio-lookup-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.raiderio-lookup-btn:disabled {
-  border-color: var(--border);
-  background: var(--bg-panel-alt);
-  color: var(--text-dim);
-  cursor: not-allowed;
-}
-
 .raiderio-dungeon-field {
   display: flex;
   flex-direction: column;
